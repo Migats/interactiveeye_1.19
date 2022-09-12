@@ -1,7 +1,7 @@
 package net.migats21.interactiveeye.mixin;
 
 import net.migats21.interactiveeye.InteractiveEye;
-import net.minecraft.client.gui.screen.TitleScreen;
+import net.minecraft.client.gui.screens.TitleScreen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;

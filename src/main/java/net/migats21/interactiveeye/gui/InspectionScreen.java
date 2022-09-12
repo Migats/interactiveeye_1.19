@@ -1,58 +1,56 @@
 package net.migats21.interactiveeye.gui;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.migats21.interactiveeye.util.StringMappings;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextHandler;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.Npc;
-import net.minecraft.entity.mob.AmbientEntity;
-import net.minecraft.entity.mob.Angerable;
-import net.minecraft.entity.mob.Monster;
-import net.minecraft.entity.passive.AnimalEntity;
-import net.minecraft.state.property.Property;
-import net.minecraft.text.*;
-import net.minecraft.util.Util;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.NeutralMob;
+import net.minecraft.world.entity.ambient.AmbientCreature;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.npc.Npc;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
 import org.apache.commons.compress.utils.Lists;
 
-import java.awt.*;
-import java.util.ArrayList;
+import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.List;
 import java.util.Map;
 
+@ParametersAreNonnullByDefault
 public class InspectionScreen implements HudRenderCallback {
     public static boolean inspecting;
     private static final List<String> inline_data = Lists.newArrayList();
 
-    private static final MinecraftClient client = MinecraftClient.getInstance();
+    private static final Minecraft minecraft = Minecraft.getInstance();
 
     @Override
-    public void onHudRender(MatrixStack matrixStack, float tickDelta) {
-        if (client == null || !inspecting) return;
-        int scaledWidth = client.getWindow().getScaledWidth();
-        int scaledHeight = client.getWindow().getScaledHeight();
+    public void onHudRender(PoseStack matrixStack, float tickDelta) {
+        if (minecraft == null || !inspecting) return;
+        int scaledWidth = minecraft.getWindow().getGuiScaledWidth();
+        int scaledHeight = minecraft.getWindow().getGuiScaledHeight();
         for (int i=0;i<inline_data.size();i++) {
             String inlineDataLine = inline_data.get(i);
-            client.textRenderer.drawWithShadow(matrixStack, inlineDataLine, scaledWidth / 2f + 95, scaledHeight - (client.textRenderer.fontHeight + 2) * (inline_data.size() - i), 0xffffff);
+            minecraft.font.drawShadow(matrixStack, inlineDataLine, scaledWidth / 2f + 95, scaledHeight - (minecraft.font.lineHeight + 2) * (inline_data.size() - i), 0xffffff);
         }
     }
     public static void inspect() {
         inline_data.clear();
-        World level = client.player.world;
-        switch (client.crosshairTarget.getType()) {
-            case ENTITY -> inspect(((EntityHitResult) client.crosshairTarget).getEntity());
-            case BLOCK -> inspect(((BlockHitResult) client.crosshairTarget).getBlockPos(), level);
+        Level level = minecraft.player.level;
+        switch (minecraft.hitResult.getType()) {
+            case ENTITY -> inspect(((EntityHitResult) minecraft.hitResult).getEntity());
+            case BLOCK -> inspect(((BlockHitResult) minecraft.hitResult).getBlockPos(), level);
             case MISS -> {
-                long currentTime = level.getTimeOfDay();
+                long currentTime = level.getDayTime();
                 int hour = ((int) Math.floor(currentTime * 0.001d) + 6) % 24;
                 int min = (int) Math.floor(currentTime * 0.06d % 60d);
                 inline_data.add("Time: " + hour + ":" + String.format("%02d", min));
@@ -61,12 +59,12 @@ public class InspectionScreen implements HudRenderCallback {
         }
     }
 
-    private static void inspect(BlockPos pos, World level) {
+    private static void inspect(BlockPos pos, Level level) {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
         inline_data.add("Block: " + block.getName().getString());
         inline_data.add("Type: " + StringMappings.materials.get(state.getMaterial()));
-        float breakspeed = 0.05f / block.calcBlockBreakingDelta(state, client.player, level, pos);
+        float breakspeed = 0.05f / block.getDestroyProgress(state, minecraft.player, level, pos);
         if (breakspeed == Float.POSITIVE_INFINITY) {
             inline_data.add("Unbreakable");
         } else if (breakspeed == 0.0f) {
@@ -74,43 +72,43 @@ public class InspectionScreen implements HudRenderCallback {
         } else {
             inline_data.add("Break in: " + String.format("%.02f", breakspeed) + "sec");
         }
-        if (state.streamTags().count() > 0) {
+        if (state.getTags().count() > 0) {
             inline_data.add("");
             inline_data.add("Tags:");
-            inline_data.addAll(state.streamTags().limit(15).map(tag -> "  #" + tag.id()).toList());
+            inline_data.addAll(state.getTags().limit(15).map(tag -> "  #" + tag.location().getPath()).toList());
         }
-        if (!state.getEntries().isEmpty()) {
+        if (!state.getValues().isEmpty()) {
             inline_data.add("");
             inline_data.add("Blockstate properties:");
-            for (Map.Entry<Property<?>, Comparable<?>> entry : state.getEntries().entrySet()) {
+            for (Map.Entry<Property<?>, Comparable<?>> entry : state.getValues().entrySet()) {
                 Property<?> property = entry.getKey();
-                inline_data.add("  " + property.getName() + ": " + Util.getValueAsString(property, entry.getValue()));
+                inline_data.add("  " + property.getName() + ": " + Util.getPropertyName(property, entry.getValue()));
             }
         }
     }
 
     public static void inspect(Entity entity) {
-        inline_data.add("Name: " + entity.getType().getName().getString());
-        String type;
+        inline_data.add("Name: " + entity.getType().getDescription().getString());
         if (entity.getType() == EntityType.ENDER_DRAGON || entity.getType() == EntityType.WITHER) {
-            type = "boss";
+            inline_data.add("Type: boss");
         } else if (entity instanceof LivingEntity livingEntity) {
-            if (entity instanceof Monster) {
-                if (entity instanceof Angerable) {
+            if (entity instanceof Enemy) {
+                if (entity instanceof NeutralMob) {
                     inline_data.add("Type: neutral");
                 } else {
                     inline_data.add("Type: hostile");
                 }
             } else if (entity instanceof Npc) {
                 inline_data.add("Type: human");
-            } else if (entity instanceof AnimalEntity || entity instanceof AmbientEntity) {
+            } else if (entity instanceof Animal || entity instanceof AmbientCreature) {
                 inline_data.add("Type: animal");
-            } else if (entity instanceof Angerable) {
+            } else if (entity instanceof NeutralMob) {
                 inline_data.add("Type: protective");
             } else {
                 inline_data.add("Type: passive");
             }
             inline_data.add("Health: " + (int)Math.ceil(livingEntity.getHealth()) + "/" + (int)livingEntity.getMaxHealth());
+
         } else {
             inline_data.add("Type: abstract");
         }

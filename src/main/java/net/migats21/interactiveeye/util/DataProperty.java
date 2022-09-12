@@ -1,15 +1,15 @@
 package net.migats21.interactiveeye.util;
 
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.Map;
 
 public abstract class DataProperty<T> {
-    private Identifier key;
+    private ResourceLocation key;
     private T value;
     private Map<String, String> additionalData;
     public DataProperty(String keyName, T value, Map<String, String> additionalData) {
-        this.key = new Identifier(keyName);
+        this.key = new ResourceLocation(keyName);
         this.value = value;
         this.additionalData = additionalData;
     }
