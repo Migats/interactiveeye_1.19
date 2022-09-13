@@ -18,11 +18,8 @@
 
   "environment": "*",
   "entrypoints": {
-    "main": [
-      "net.migats21.interactiveeye.InteractiveEye"
-    ],
     "client": [
-      "net.migats21.interactiveeye.InteractiveEyeClient"
+      "net.migats21.interactiveeye.InteractiveEye"
     ]
   },
   "mixins": [

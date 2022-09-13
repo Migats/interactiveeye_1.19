@@ -5,7 +5,14 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.migats21.interactiveeye.util.StringMappings;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.controls.KeyBindsScreen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.ContainerListener;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -14,6 +21,7 @@ import net.minecraft.world.entity.ambient.AmbientCreature;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.npc.Npc;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -34,18 +42,32 @@ public class InspectionScreen implements HudRenderCallback {
     private static final Minecraft minecraft = Minecraft.getInstance();
 
     @Override
-    public void onHudRender(PoseStack matrixStack, float tickDelta) {
-        if (minecraft == null || !inspecting) return;
+    public void onHudRender(PoseStack poseStack, float tickDelta) {
+        if (minecraft.screen == null) {
+            render(poseStack, tickDelta);
+        }
+    }
+    public static void render(PoseStack poseStack, float tickDelta) {
+        if (!inspecting || inline_data.isEmpty()) return;
         int scaledWidth = minecraft.getWindow().getGuiScaledWidth();
         int scaledHeight = minecraft.getWindow().getGuiScaledHeight();
         for (int i=0;i<inline_data.size();i++) {
             String inlineDataLine = inline_data.get(i);
-            minecraft.font.drawShadow(matrixStack, inlineDataLine, scaledWidth / 2f + 95, scaledHeight - (minecraft.font.lineHeight + 2) * (inline_data.size() - i), 0xffffff);
+            minecraft.font.drawShadow(poseStack, inlineDataLine, scaledWidth / 2f + 95, scaledHeight - (minecraft.font.lineHeight + 2) * (inline_data.size() - i), 0xffffff);
         }
     }
     public static void inspect() {
         inline_data.clear();
-        Level level = minecraft.player.level;
+        if (minecraft.level != null) {
+            if (minecraft.screen == null) {
+                inspect(minecraft.level);
+            } else if (minecraft.screen instanceof AbstractContainerScreen screen) {
+                inspect(screen);
+            }
+        }
+    }
+
+    public static void inspect(Level level) {
         switch (minecraft.hitResult.getType()) {
             case ENTITY -> inspect(((EntityHitResult) minecraft.hitResult).getEntity());
             case BLOCK -> inspect(((BlockHitResult) minecraft.hitResult).getBlockPos(), level);
@@ -58,6 +80,20 @@ public class InspectionScreen implements HudRenderCallback {
             }
         }
     }
+
+    private static void inspect(AbstractContainerScreen screen) {
+        if (screen instanceof EffectRenderingInventoryScreen<?>) {
+            if (screen instanceof CreativeModeInventoryScreen creativeModeInventoryScreen) {
+                if (creativeModeInventoryScreen.getSelectedTab() == CreativeModeTab.TAB_SEARCH.getId()) return;
+                inline_data.add("Current screen: Creative");
+            } else {
+                inline_data.add("Current screen: Inventory");
+            }
+        } else {
+            inline_data.add("Current screen: " + screen.getTitle().getString());
+        }
+    }
+
 
     private static void inspect(BlockPos pos, Level level) {
         BlockState state = level.getBlockState(pos);
