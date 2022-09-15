@@ -5,6 +5,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.migats21.interactiveeye.util.StringMappings;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.controls.KeyBindsScreen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -21,7 +22,10 @@ import net.minecraft.world.entity.ambient.AmbientCreature;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.npc.Npc;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -31,6 +35,7 @@ import net.minecraft.world.phys.EntityHitResult;
 import org.apache.commons.compress.utils.Lists;
 
 import javax.annotation.ParametersAreNonnullByDefault;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -61,8 +66,8 @@ public class InspectionScreen implements HudRenderCallback {
         if (minecraft.level != null) {
             if (minecraft.screen == null) {
                 inspect(minecraft.level);
-            } else if (minecraft.screen instanceof AbstractContainerScreen screen) {
-                inspect(screen);
+            } else {
+                inspect(minecraft.screen);
             }
         }
     }
@@ -81,16 +86,46 @@ public class InspectionScreen implements HudRenderCallback {
         }
     }
 
-    private static void inspect(AbstractContainerScreen screen) {
-        if (screen instanceof EffectRenderingInventoryScreen<?>) {
-            if (screen instanceof CreativeModeInventoryScreen creativeModeInventoryScreen) {
-                if (creativeModeInventoryScreen.getSelectedTab() == CreativeModeTab.TAB_SEARCH.getId()) return;
-                inline_data.add("Current screen: Creative");
+    private static void inspect(Screen screen) {
+        if (screen instanceof AbstractContainerScreen<?> containerScreen) {
+            if (screen instanceof EffectRenderingInventoryScreen<?>) {
+                if (screen instanceof CreativeModeInventoryScreen creativeScreen) {
+                    int selectedTabId = creativeScreen.getSelectedTab();
+                    if (selectedTabId == CreativeModeTab.TAB_SEARCH.getId()) return;
+                    inline_data.add("Current screen: Creative");
+                    if (selectedTabId == CreativeModeTab.TAB_INVENTORY.getId()) {
+                        inline_data.add("Current tab: Inventory");
+                    } else {
+                        CreativeModeTab selectedTab = null;
+                        for (CreativeModeTab tab : CreativeModeTab.TABS) {
+                            if (tab.getId() == selectedTabId) {
+                                selectedTab = tab;
+                                break;
+                            }
+                        }
+                        inline_data.add("Current tab: " + selectedTab.getDisplayName().getString());
+                    }
+                } else {
+                    inline_data.add("Current screen: Inventory");
+                }
             } else {
-                inline_data.add("Current screen: Inventory");
+                inline_data.add("Current screen: " + screen.getTitle().getString());
             }
-        } else {
-            inline_data.add("Current screen: " + screen.getTitle().getString());
+            double xpos = minecraft.mouseHandler.xpos() * (double)minecraft.getWindow().getGuiScaledWidth() / (double)minecraft.getWindow().getScreenWidth();
+            double ypos = minecraft.mouseHandler.ypos() * (double)minecraft.getWindow().getGuiScaledHeight() / (double)minecraft.getWindow().getScreenHeight();
+            Slot hoveredSlot = containerScreen.findSlot(xpos, ypos);
+            ItemStack carrying = containerScreen.getMenu().getCarried();
+            if (hoveredSlot != null) {
+                ItemStack hoveredStack = hoveredSlot.getItem();
+                if (!hoveredStack.isEmpty()) {
+                    inline_data.add("Item: " + hoveredStack.getItem().getDescription().getString());
+                    int damage = hoveredStack.getDamageValue();
+                    if (damage != 0) {
+                        int maxDamage = hoveredStack.getMaxDamage();
+                        inline_data.add("Durability: " + (maxDamage - damage) + "/" + maxDamage);
+                    }
+                }
+            }
         }
     }
 
