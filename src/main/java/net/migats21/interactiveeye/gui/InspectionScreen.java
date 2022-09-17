@@ -1,19 +1,17 @@
 package net.migats21.interactiveeye.gui;
 
+import com.google.common.collect.ImmutableSet;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.migats21.interactiveeye.util.StringMappings;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.controls.KeyBindsScreen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
-import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.ContainerListener;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -23,9 +21,10 @@ import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.npc.Npc;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -35,7 +34,6 @@ import net.minecraft.world.phys.EntityHitResult;
 import org.apache.commons.compress.utils.Lists;
 
 import javax.annotation.ParametersAreNonnullByDefault;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -75,7 +73,7 @@ public class InspectionScreen implements HudRenderCallback {
     public static void inspect(Level level) {
         switch (minecraft.hitResult.getType()) {
             case ENTITY -> inspect(((EntityHitResult) minecraft.hitResult).getEntity());
-            case BLOCK -> inspect(((BlockHitResult) minecraft.hitResult).getBlockPos(), level);
+            case BLOCK -> inspect(((BlockHitResult) minecraft.hitResult).getBlockPos(), level, (BlockHitResult)minecraft.hitResult);
             case MISS -> {
                 long currentTime = level.getDayTime();
                 int hour = ((int) Math.floor(currentTime * 0.001d) + 6) % 24;
@@ -130,7 +128,7 @@ public class InspectionScreen implements HudRenderCallback {
     }
 
 
-    private static void inspect(BlockPos pos, Level level) {
+    private static void inspect(BlockPos pos, Level level, BlockHitResult hitResult) {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
         inline_data.add("Block: " + block.getName().getString());
@@ -143,17 +141,33 @@ public class InspectionScreen implements HudRenderCallback {
         } else {
             inline_data.add("Break in: " + String.format("%.02f", breakspeed) + "sec");
         }
-        if (state.getTags().count() > 0) {
-            inline_data.add("");
-            inline_data.add("Tags:");
-            inline_data.addAll(state.getTags().limit(15).map(tag -> "  #" + tag.location().getPath()).toList());
-        }
         if (!state.getValues().isEmpty()) {
             inline_data.add("");
             inline_data.add("Blockstate properties:");
-            for (Map.Entry<Property<?>, Comparable<?>> entry : state.getValues().entrySet()) {
+            ImmutableSet<Map.Entry<Property<?>, Comparable<?>>> stateentries = state.getValues().entrySet();
+            for (Map.Entry<Property<?>, Comparable<?>> entry : stateentries) {
                 Property<?> property = entry.getKey();
                 inline_data.add("  " + property.getName() + ": " + Util.getPropertyName(property, entry.getValue()));
+            }
+        }
+        ItemStack handItem = minecraft.player.getMainHandItem();
+        if (!handItem.isEmpty()) {
+            if (handItem.getItem() instanceof BlockItem blockItem) {
+                BlockPlaceContext placeContext = new BlockPlaceContext(minecraft.player, InteractionHand.MAIN_HAND, minecraft.player.getMainHandItem(), hitResult);
+                inline_data.add("");
+                BlockState placingState = blockItem.getPlacementState(placeContext);
+                if (placingState != null && placeContext.canPlace()) {
+                    inline_data.add((placeContext.getClickedPos().equals(pos) ? "Replaces: " : "Places: ") + placingState.getBlock().getName().getString());
+                    if (!placingState.getValues().isEmpty()) {
+                        ImmutableSet<Map.Entry<Property<?>, Comparable<?>>> stateentries = placingState.getValues().entrySet();
+                        for (Map.Entry<Property<?>, Comparable<?>> entry : stateentries) {
+                            Property<?> property = entry.getKey();
+                            inline_data.add("  " + property.getName() + ": " + Util.getPropertyName(property, entry.getValue()));
+                        }
+                    }
+                } else {
+                    inline_data.add("Cannot be placed");
+                }
             }
         }
     }
