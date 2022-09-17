@@ -117,10 +117,43 @@ public class InspectionScreen implements HudRenderCallback {
                 ItemStack hoveredStack = hoveredSlot.getItem();
                 if (!hoveredStack.isEmpty()) {
                     inline_data.add("Item: " + hoveredStack.getItem().getDescription().getString());
+                    int maxStackSize = hoveredStack.getItem().getMaxStackSize();
+                    if (maxStackSize > 1) {
+                        inline_data.add(maxStackSize + " stackable");
+                        if (!carrying.isEmpty()) {
+                            if (hoveredSlot instanceof CreativeModeInventoryScreen.CustomCreativeSlot) {
+                                inline_data.add("Destroys carried item");
+                            } else if (!hoveredSlot.mayPlace(carrying)) {
+                                inline_data.add("Cannot place inside");
+                            } else if (ItemStack.isSameItemSameTags(carrying, hoveredStack) && hoveredStack.getCount() < maxStackSize && carrying.getCount() < maxStackSize) {
+                                int stackleft = carrying.getCount() + hoveredStack.getCount() - maxStackSize;
+                                inline_data.add(stackleft > 0 ? "Can stack, " + stackleft + " remains" : "Can stack");
+                            } else {
+                                inline_data.add("Cannot stack");
+                            }
+                        }
+                    } else {
+                        inline_data.add("unstackable");
+                        if (!carrying.isEmpty()) {
+                            inline_data.add(hoveredSlot instanceof CreativeModeInventoryScreen.CustomCreativeSlot ? "Destroys carried item" : hoveredSlot.mayPlace(carrying) ? "Can place inside" : "Cannot place inside");
+                        }
+                    }
                     int damage = hoveredStack.getDamageValue();
                     if (damage != 0) {
                         int maxDamage = hoveredStack.getMaxDamage();
                         inline_data.add("Durability: " + (maxDamage - damage) + "/" + maxDamage);
+                    }
+                    if (hoveredStack.getItem().isEnchantable(hoveredStack)) {
+                        if (hoveredStack.isEnchanted()) {
+                            inline_data.add("Enchantment weight: " + hoveredStack.getBaseRepairCost());
+                        } else {
+                            inline_data.add("Enchantable");
+                        }
+                    }
+                } else {
+                    inline_data.add("Slot: empty");
+                    if (!carrying.isEmpty()) {
+                        inline_data.add(hoveredSlot instanceof CreativeModeInventoryScreen.CustomCreativeSlot ? "Destroys carried item" : hoveredSlot.mayPlace(carrying) ? "Can place inside" : "Cannot place inside");
                     }
                 }
             }
