@@ -1,6 +1,7 @@
 package net.migats21.interactiveeye.gui;
 
 import com.google.common.collect.ImmutableSet;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.migats21.interactiveeye.util.StringMappings;
@@ -10,6 +11,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
@@ -38,24 +40,19 @@ import java.util.List;
 import java.util.Map;
 
 @ParametersAreNonnullByDefault
-public class InspectionScreen implements HudRenderCallback {
+public class InspectionScreen {
     public static boolean inspecting;
     private static final List<String> inline_data = Lists.newArrayList();
 
     private static final Minecraft minecraft = Minecraft.getInstance();
 
-    @Override
-    public void onHudRender(PoseStack poseStack, float tickDelta) {
-        if (minecraft.screen == null) {
-            render(poseStack, tickDelta);
-        }
-    }
     public static void render(PoseStack poseStack, float tickDelta) {
         if (!inspecting || inline_data.isEmpty()) return;
         int scaledWidth = minecraft.getWindow().getGuiScaledWidth();
         int scaledHeight = minecraft.getWindow().getGuiScaledHeight();
         for (int i=0;i<inline_data.size();i++) {
             String inlineDataLine = inline_data.get(i);
+            RenderSystem.setShader(GameRenderer::getPositionColorShader);
             minecraft.font.drawShadow(poseStack, inlineDataLine, scaledWidth / 2f + 95, scaledHeight - (minecraft.font.lineHeight + 2) * (inline_data.size() - i), 0xffffff);
         }
     }

@@ -18,7 +18,7 @@ public class KeyInputHandler {
 
     public static void register() {
         key_inspect = KeyBindingHelper.registerKeyBinding(new KeyMapping(KEY_INSPECT, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, KEYCATEGORY_INTERACTIVEEYE));
-        ClientTickEvents.END_WORLD_TICK.register((client) -> {
+        ClientTickEvents.END_CLIENT_TICK.register((client) -> {
             boolean pressed = InputConstants.isKeyDown(Minecraft.getInstance().getWindow().getWindow(), KeyBindingHelper.getBoundKeyOf(key_inspect).getValue());
             if (pressed && !InspectionScreen.inspecting) {
                 InspectionScreen.inspect();

@@ -6,7 +6,7 @@
   "mixins": [
   ],
   "client": [
-    "MixinContainerScreenHud"
+    "MixinGameGlobalHud"
   ],
   "injectors": {
     "defaultRequire": 1
