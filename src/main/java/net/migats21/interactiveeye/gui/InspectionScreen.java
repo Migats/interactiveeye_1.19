@@ -61,8 +61,9 @@ public class InspectionScreen {
         int hudsize = (minecraft.font.lineHeight + 2) * inline_data.size();
         int animated_hudsize = (int) (bezierCurveAnimation(Math.min(ani_progress/8.0f, 1.0f), 0, 0.75f, 1.0f, 1.0f) * hudsize);
         GuiComponent.fill(poseStack, width / 2 + 98, height - 3, width - 2, height - 2, 0xff81e386);
-        GuiComponent.fill(poseStack, width / 2 + 98, height - animated_hudsize - 4, width - 2, height - 3, 0x40458a48);
+        GuiComponent.fill(poseStack, width / 2 + 98, height - animated_hudsize - 4, width - 2, height - 3, minecraft.screen == null ? 0x40458a48 : 0xe00f2e11);
         GuiComponent.fill(poseStack, width / 2 + 98, height - animated_hudsize - 5, width - 2, height - animated_hudsize - 4, 0xff81e386);
+        poseStack.translate(0.0, 0.0, 1000.0);
         if (animated_hudsize == hudsize) {
             for (int i = 0; i < inline_data.size(); i++) {
                 String inlineDataLine = inline_data.get(i);
@@ -71,9 +72,9 @@ public class InspectionScreen {
         }
     }
 
+    // Bezier curve formula provided by technobroken
     private static float bezierCurveAnimation(float t, float c0, float c1, float c2, float c3) {
-        return (float) (Math.pow(t,3)*(c0+3.0f*c1-3.0f*c2+c3) + Math.pow(t,2)*(3.0f*c0-6.0f*c1+3.0f*c2)+
-                t*(-3.0f*c0+3.0f*c1)+c0);
+        return (float) (Math.pow(t,3)*(c0+3.0f*c1-3.0f*c2+c3) + Math.pow(t,2)*(3.0f*c0-6.0f*c1+3.0f*c2)+t*(-3.0f*c0+3.0f*c1)+c0);
     }
 
     public static void inspect() {
