@@ -7,12 +7,14 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.migats21.interactiveeye.util.StringMappings;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiComponent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -36,6 +38,7 @@ import net.minecraft.world.phys.EntityHitResult;
 import org.apache.commons.compress.utils.Lists;
 
 import javax.annotation.ParametersAreNonnullByDefault;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -45,17 +48,34 @@ public class InspectionScreen {
     private static final List<String> inline_data = Lists.newArrayList();
 
     private static final Minecraft minecraft = Minecraft.getInstance();
+    private static float ani_progress;
 
     public static void render(PoseStack poseStack, float tickDelta) {
-        if (!inspecting || inline_data.isEmpty()) return;
-        int scaledWidth = minecraft.getWindow().getGuiScaledWidth();
-        int scaledHeight = minecraft.getWindow().getGuiScaledHeight();
-        for (int i=0;i<inline_data.size();i++) {
-            String inlineDataLine = inline_data.get(i);
-            RenderSystem.setShader(GameRenderer::getPositionColorShader);
-            minecraft.font.drawShadow(poseStack, inlineDataLine, scaledWidth / 2f + 95, scaledHeight - (minecraft.font.lineHeight + 2) * (inline_data.size() - i), 0xffffff);
+        if (!inspecting || inline_data.isEmpty()) {
+            ani_progress = 0.0f;
+            return;
+        }
+        ani_progress += tickDelta;
+        int width = minecraft.getWindow().getGuiScaledWidth();
+        int height = minecraft.getWindow().getGuiScaledHeight();
+        int hudsize = (minecraft.font.lineHeight + 2) * inline_data.size();
+        int animated_hudsize = (int) (bezierCurveAnimation(Math.min(ani_progress/8.0f, 1.0f), 0, 0.75f, 1.0f, 1.0f) * hudsize);
+        GuiComponent.fill(poseStack, width / 2 + 98, height - 3, width - 2, height - 2, 0xff81e386);
+        GuiComponent.fill(poseStack, width / 2 + 98, height - animated_hudsize - 4, width - 2, height - 3, 0x40458a48);
+        GuiComponent.fill(poseStack, width / 2 + 98, height - animated_hudsize - 5, width - 2, height - animated_hudsize - 4, 0xff81e386);
+        if (animated_hudsize == hudsize) {
+            for (int i = 0; i < inline_data.size(); i++) {
+                String inlineDataLine = inline_data.get(i);
+                minecraft.font.draw(poseStack, inlineDataLine, width / 2f + 100, height - (minecraft.font.lineHeight + 2) * (inline_data.size() - i) - 2, 0xc0ffffff);
+            }
         }
     }
+
+    private static float bezierCurveAnimation(float t, float c0, float c1, float c2, float c3) {
+        return (float) (Math.pow(t,3)*(c0+3.0f*c1-3.0f*c2+c3) + Math.pow(t,2)*(3.0f*c0-6.0f*c1+3.0f*c2)+
+                t*(-3.0f*c0+3.0f*c1)+c0);
+    }
+
     public static void inspect() {
         inline_data.clear();
         if (minecraft.level != null) {
