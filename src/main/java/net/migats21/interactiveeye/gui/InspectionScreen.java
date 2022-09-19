@@ -140,6 +140,7 @@ public class InspectionScreen {
                 ItemStack hoveredStack = hoveredSlot.getItem();
                 if (!hoveredStack.isEmpty()) {
                     inline_data.add("Item: " + hoveredStack.getItem().getDescription().getString());
+                    inline_data.add("Type: " + hoveredStack.getItem().getItemCategory().getDisplayName().getString());
                     int maxStackSize = hoveredStack.getItem().getMaxStackSize();
                     if (maxStackSize > 1) {
                         inline_data.add(maxStackSize + " stackable");
