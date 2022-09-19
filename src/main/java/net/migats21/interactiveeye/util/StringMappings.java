@@ -1,13 +1,19 @@
 package net.migats21.interactiveeye.util;
 
+import com.google.common.collect.Maps;
+import io.netty.util.Attribute;
 import net.minecraft.world.level.material.Material;
+import net.minecraft.world.level.material.MaterialColor;
 
 import java.util.HashMap;
+import java.util.Map;
 
 public class StringMappings {
-    public static HashMap<Material, String> materials = new HashMap<>();
+    public static Map<Material, String> materials;
+    public static Map<MaterialColor, String> materialColors;
 
     public static void init() {
+        materials = Maps.newHashMap();
         materials.put(Material.AIR,"air");
         materials.put(Material.AMETHYST,"amethyst");
         materials.put(Material.BAMBOO,"bamboo");
@@ -56,5 +62,69 @@ public class StringMappings {
         materials.put(Material.WEB,"cobweb");
         materials.put(Material.WOOD,"wood");
         materials.put(Material.WOOL,"wool");
+
+        materialColors = Maps.newHashMap();
+        materialColors.put(MaterialColor.CLAY, "clay");
+        materialColors.put(MaterialColor.COLOR_BLACK, "black");
+        materialColors.put(MaterialColor.COLOR_BLUE, "blue");
+        materialColors.put(MaterialColor.COLOR_BROWN, "brown");
+        materialColors.put(MaterialColor.COLOR_CYAN, "cyan");
+        materialColors.put(MaterialColor.COLOR_GRAY, "gray");
+        materialColors.put(MaterialColor.COLOR_GREEN, "black");
+        materialColors.put(MaterialColor.COLOR_LIGHT_BLUE, "light blue");
+        materialColors.put(MaterialColor.COLOR_LIGHT_GRAY, "light gray");
+        materialColors.put(MaterialColor.COLOR_LIGHT_GREEN, "light green");
+        materialColors.put(MaterialColor.COLOR_MAGENTA, "magenta");
+        materialColors.put(MaterialColor.COLOR_ORANGE, "orange");
+        materialColors.put(MaterialColor.COLOR_PINK, "pink");
+        materialColors.put(MaterialColor.COLOR_PURPLE, "purple");
+        materialColors.put(MaterialColor.COLOR_RED, "red");
+        materialColors.put(MaterialColor.COLOR_YELLOW, "yellow");
+        materialColors.put(MaterialColor.CRIMSON_HYPHAE, "crimson hyphae");
+        materialColors.put(MaterialColor.CRIMSON_NYLIUM, "crimson nylium");
+        materialColors.put(MaterialColor.CRIMSON_STEM, "crimson wood");
+        materialColors.put(MaterialColor.DEEPSLATE, "deepslate");
+        materialColors.put(MaterialColor.DIAMOND, "diamond");
+        materialColors.put(MaterialColor.DIRT, "dirt");
+        materialColors.put(MaterialColor.EMERALD, "emerald");
+        materialColors.put(MaterialColor.FIRE, "fire");
+        materialColors.put(MaterialColor.GLOW_LICHEN, "glow lichen");
+        materialColors.put(MaterialColor.GOLD, "gold");
+        materialColors.put(MaterialColor.GRASS, "grass");
+        materialColors.put(MaterialColor.ICE, "ice");
+        materialColors.put(MaterialColor.LAPIS, "lapis");
+        materialColors.put(MaterialColor.METAL, "metalic");
+        materialColors.put(MaterialColor.NETHER, "nether");
+        materialColors.put(MaterialColor.NONE, "transparent");
+        materialColors.put(MaterialColor.PLANT, "plant");
+        materialColors.put(MaterialColor.PODZOL, "podzol");
+        materialColors.put(MaterialColor.QUARTZ, "quartz");
+        materialColors.put(MaterialColor.RAW_IRON, "raw iron");
+        materialColors.put(MaterialColor.SAND, "sand");
+        materialColors.put(MaterialColor.SNOW, "snow");
+        materialColors.put(MaterialColor.STONE, "stone");
+        materialColors.put(MaterialColor.TERRACOTTA_BLACK, "terracotta black");
+        materialColors.put(MaterialColor.TERRACOTTA_BLUE, "terracotta blue");
+        materialColors.put(MaterialColor.TERRACOTTA_BROWN, "terracotta brown");
+        materialColors.put(MaterialColor.TERRACOTTA_CYAN, "terracotta cyan");
+        materialColors.put(MaterialColor.TERRACOTTA_GRAY, "terracotta gray");
+        materialColors.put(MaterialColor.TERRACOTTA_GREEN, "terracotta green");
+        materialColors.put(MaterialColor.TERRACOTTA_LIGHT_BLUE, "terracotta light blue");
+        materialColors.put(MaterialColor.TERRACOTTA_LIGHT_GRAY, "terracotta light gray");
+        materialColors.put(MaterialColor.TERRACOTTA_LIGHT_GREEN, "terracotta light green");
+        materialColors.put(MaterialColor.TERRACOTTA_MAGENTA, "terracotta magenta");
+        materialColors.put(MaterialColor.TERRACOTTA_ORANGE, "terracotta orange");
+        materialColors.put(MaterialColor.TERRACOTTA_PINK, "terracotta pink");
+        materialColors.put(MaterialColor.TERRACOTTA_PURPLE, "terracotta purple");
+        materialColors.put(MaterialColor.TERRACOTTA_RED, "terracotta red");
+        materialColors.put(MaterialColor.TERRACOTTA_WHITE, "terracotta white");
+        materialColors.put(MaterialColor.TERRACOTTA_YELLOW, "terracotta yellow");
+        materialColors.put(MaterialColor.WATER, "water");
+        materialColors.put(MaterialColor.WARPED_HYPHAE, "warped hyphae");
+        materialColors.put(MaterialColor.WARPED_NYLIUM, "warped nylium");
+        materialColors.put(MaterialColor.WARPED_STEM, "warped stem");
+        materialColors.put(MaterialColor.WARPED_WART_BLOCK, "warped wart");
+        materialColors.put(MaterialColor.WOOD, "wood");
+        materialColors.put(MaterialColor.WOOL, "wool");
     }
 }

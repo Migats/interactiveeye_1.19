@@ -14,6 +14,8 @@ import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
@@ -28,6 +30,7 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -41,6 +44,7 @@ import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @ParametersAreNonnullByDefault
 public class InspectionScreen {
@@ -96,6 +100,7 @@ public class InspectionScreen {
                 long currentTime = level.getDayTime();
                 int hour = ((int) Math.floor(currentTime * 0.001d) + 6) % 24;
                 int min = (int) Math.floor(currentTime * 0.06d % 60d);
+                inline_data.add("Dimension: " + Component.translatable(level.dimension().location().toLanguageKey()).getString());
                 inline_data.add("Time: " + hour + ":" + String.format("%02d", min));
                 inline_data.add("Weather: " + (level.isThundering() ? "thunder" : level.isRaining() ? "raining" : "clear"));
             }
@@ -151,7 +156,7 @@ public class InspectionScreen {
                             }
                         }
                     } else {
-                        inline_data.add("unstackable");
+                        inline_data.add("Unstackable");
                         if (!carrying.isEmpty()) {
                             inline_data.add(hoveredSlot instanceof CreativeModeInventoryScreen.CustomCreativeSlot ? "Destroys carried item" : hoveredSlot.mayPlace(carrying) ? "Can place inside" : "Cannot place inside");
                         }
@@ -169,7 +174,7 @@ public class InspectionScreen {
                         }
                     }
                 } else {
-                    inline_data.add("Slot: empty");
+                    inline_data.add("Slot: Empty");
                     if (!carrying.isEmpty()) {
                         inline_data.add(hoveredSlot instanceof CreativeModeInventoryScreen.CustomCreativeSlot ? "Destroys carried item" : hoveredSlot.mayPlace(carrying) ? "Can place inside" : "Cannot place inside");
                     }
@@ -183,7 +188,11 @@ public class InspectionScreen {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
         inline_data.add("Block: " + block.getName().getString());
-        inline_data.add("Type: " + StringMappings.materials.get(state.getMaterial()));
+        inline_data.add("Type: " + Objects.requireNonNullElse(StringMappings.materials.get(state.getMaterial()), "unknown"));
+        ItemStack handItem = minecraft.player.getMainHandItem();
+        if (handItem.is(Items.FILLED_MAP) || handItem.is(Items.MAP)) {
+            inline_data.add("Color: " + Objects.requireNonNullElse(StringMappings.materialColors.get(state.getMapColor(level, pos)), "unknown"));
+        }
         float breakspeed = 0.05f / block.getDestroyProgress(state, minecraft.player, level, pos);
         if (breakspeed == Float.POSITIVE_INFINITY) {
             inline_data.add("Unbreakable");
@@ -201,7 +210,6 @@ public class InspectionScreen {
                 inline_data.add("  " + property.getName() + ": " + Util.getPropertyName(property, entry.getValue()));
             }
         }
-        ItemStack handItem = minecraft.player.getMainHandItem();
         if (!handItem.isEmpty()) {
             if (handItem.getItem() instanceof BlockItem blockItem) {
                 BlockPlaceContext placeContext = new BlockPlaceContext(minecraft.player, InteractionHand.MAIN_HAND, minecraft.player.getMainHandItem(), hitResult);
@@ -219,6 +227,24 @@ public class InspectionScreen {
                 } else {
                     inline_data.add("Cannot be placed");
                 }
+            }
+        }
+        int redstoneSignal = level.getSignal(pos, hitResult.getDirection().getOpposite());
+        if (redstoneSignal > 0) {
+            inline_data.add("");
+            inline_data.add("Redstone signal: " + redstoneSignal);
+            if (state.isRedstoneConductor(level, pos) && level.getDirectSignalTo(pos) == redstoneSignal) {
+                for(Direction direction : Direction.values()) {
+                    BlockPos blockPos = pos.relative(direction);
+                    if (level.getDirectSignal(blockPos, direction) == redstoneSignal) {
+                        inline_data.add("Powered by: " + level.getBlockState(blockPos).getBlock().getName().getString());
+                        break;
+                    }
+                }
+            } else if (state.isSignalSource()) {
+                inline_data.add("Power from source");
+            } else {
+                inline_data.add("Quazi powered");
             }
         }
     }
