@@ -1,9 +1,10 @@
 package net.migats21.interactiveeye.gui;
 
 import com.google.common.collect.ImmutableSet;
+import com.mojang.blaze3d.shaders.Uniform;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import com.mojang.blaze3d.vertex.*;
+import net.migats21.interactiveeye.InteractiveEye;
 import net.migats21.interactiveeye.util.StringMappings;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
@@ -13,10 +14,13 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
+import net.minecraft.network.chat.Style;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -39,9 +43,10 @@ import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import org.apache.commons.compress.utils.Lists;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.ParametersAreNonnullByDefault;
-import java.util.ArrayList;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -53,6 +58,20 @@ public class InspectionScreen {
 
     private static final Minecraft minecraft = Minecraft.getInstance();
     private static float ani_progress;
+    private static final ShaderInstance SCREEN_SHUTTER_SHADER = createScreenShutterShader();
+
+    @NotNull
+    private static ShaderInstance createScreenShutterShader() {
+        try {
+            return new ShaderInstance(minecraft.getResourceManager(), "screen_shutter", DefaultVertexFormat.POSITION_TEX);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static final Style font = Style.EMPTY.withFont(new ResourceLocation(InteractiveEye.MODID, "rounded"));
+
+    private static final Uniform INTENSITY = SCREEN_SHUTTER_SHADER.getUniform("Intensity");
 
     public static void render(PoseStack poseStack, float tickDelta) {
         if (!inspecting || inline_data.isEmpty()) {
@@ -69,11 +88,28 @@ public class InspectionScreen {
         GuiComponent.fill(poseStack, width / 2 + 98, height - animated_hudsize - 5, width - 2, height - animated_hudsize - 4, 0xff81e386);
         poseStack.translate(0.0, 0.0, 1000.0);
         if (animated_hudsize == hudsize) {
+            BufferBuilder bufferBuilder = Tesselator.getInstance().getBuilder();
+            MultiBufferSource.BufferSource bufferSource = MultiBufferSource.immediate(bufferBuilder);
             for (int i = 0; i < inline_data.size(); i++) {
-                String inlineDataLine = inline_data.get(i);
-                minecraft.font.draw(poseStack, inlineDataLine, width / 2f + 100, height - (minecraft.font.lineHeight + 2) * (inline_data.size() - i) - 2, 0xc0ffffff);
+                Component styledDataLine = Component.literal(inline_data.get(i)).setStyle(font);
+                minecraft.font.drawInBatch(styledDataLine, width / 2f + 100, height - (minecraft.font.lineHeight + 2) * (inline_data.size() - i) - 2, 0xc0ffffff, false, poseStack.last().pose(), bufferSource, false, 0, 0xF000F0);
+            }
+            if (ani_progress < 14.0f) {
+                RenderSystem.setShader(InspectionScreen::getScreenShutterShader);
+                if (INTENSITY != null) {
+                    INTENSITY.set(ani_progress);
+                    RenderSystem.glUniform1(INTENSITY.getLocation(), INTENSITY.getFloatBuffer());
+                }
+                BufferUploader.drawWithShader(bufferBuilder.end());
+            } else {
+                BufferUploader.draw(bufferBuilder.end());
             }
         }
+    }
+
+    @NotNull
+    private static ShaderInstance getScreenShutterShader() {
+        return SCREEN_SHUTTER_SHADER;
     }
 
     // Bezier curve formula provided by technobroken
