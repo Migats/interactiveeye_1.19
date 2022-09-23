@@ -1,7 +1,6 @@
 package net.migats21.interactiveeye.gui;
 
 import com.google.common.collect.ImmutableSet;
-import com.mojang.blaze3d.shaders.Uniform;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import net.migats21.interactiveeye.InteractiveEye;
@@ -13,7 +12,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
-import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.core.BlockPos;
@@ -71,8 +69,6 @@ public class InspectionScreen {
 
     private static final Style font = Style.EMPTY.withFont(new ResourceLocation(InteractiveEye.MODID, "rounded"));
 
-    private static final Uniform INTENSITY = SCREEN_SHUTTER_SHADER.getUniform("Intensity");
-
     public static void render(PoseStack poseStack, float tickDelta) {
         if (!inspecting || inline_data.isEmpty()) {
             ani_progress = 0.0f;
@@ -83,23 +79,28 @@ public class InspectionScreen {
         int height = minecraft.getWindow().getGuiScaledHeight();
         int hudsize = (minecraft.font.lineHeight + 2) * inline_data.size();
         int animated_hudsize = (int) (bezierCurveAnimation(Math.min(ani_progress/8.0f, 1.0f), 0, 0.75f, 1.0f, 1.0f) * hudsize);
-        GuiComponent.fill(poseStack, width / 2 + 98, height - 3, width - 2, height - 2, 0xff81e386);
-        GuiComponent.fill(poseStack, width / 2 + 98, height - animated_hudsize - 4, width - 2, height - 3, minecraft.screen == null ? 0x40458a48 : 0xe00f2e11);
-        GuiComponent.fill(poseStack, width / 2 + 98, height - animated_hudsize - 5, width - 2, height - animated_hudsize - 4, 0xff81e386);
+        int x = width / 2 + 98;
+        int y = height - animated_hudsize - 4;
+        GuiComponent.fill(poseStack, x, height - 3, width - 2, height - 2, 0xff81e386);
+        GuiComponent.fill(poseStack, x, y, width - 2, height - 3, minecraft.screen == null ? 0x40458a48 : 0xe00f2e11);
+        GuiComponent.fill(poseStack, x, y - 1, width - 2, y, 0xff81e386);
         poseStack.translate(0.0, 0.0, 1000.0);
         if (animated_hudsize == hudsize) {
-            BufferBuilder bufferBuilder = Tesselator.getInstance().getBuilder();
+            BufferBuilder bufferBuilder = RenderSystem.renderThreadTesselator().getBuilder();
             MultiBufferSource.BufferSource bufferSource = MultiBufferSource.immediate(bufferBuilder);
             for (int i = 0; i < inline_data.size(); i++) {
                 Component styledDataLine = Component.literal(inline_data.get(i)).setStyle(font);
                 minecraft.font.drawInBatch(styledDataLine, width / 2f + 100, height - (minecraft.font.lineHeight + 2) * (inline_data.size() - i) - 2, 0xc0ffffff, false, poseStack.last().pose(), bufferSource, false, 0, 0xF000F0);
             }
+            bufferSource.endBatch();
+            bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+            bufferBuilder.vertex(poseStack.last().pose(), x, y, 0.0f).color(0xffffffff).uv(0.0f, 0.0f).endVertex();
+            bufferBuilder.vertex(poseStack.last().pose(), width - 2, y, 0.0f).color(0xffffffff).uv(1.0f, 0.0f).endVertex();
+            bufferBuilder.vertex(poseStack.last().pose(), width - 2, height - 3, 0.0f).color(0xffffffff).uv(1.0f, 1.0f).endVertex();
+            bufferBuilder.vertex(poseStack.last().pose(), x, height - 3, 0.0f).color(0xffffffff).uv(0.0f, 1.0f).endVertex();
             if (ani_progress < 14.0f) {
                 RenderSystem.setShader(InspectionScreen::getScreenShutterShader);
-                if (INTENSITY != null) {
-                    INTENSITY.set(ani_progress);
-                    RenderSystem.glUniform1(INTENSITY.getLocation(), INTENSITY.getFloatBuffer());
-                }
+                getScreenShutterShader().safeGetUniform("Intensity").set(ani_progress);
                 BufferUploader.drawWithShader(bufferBuilder.end());
             } else {
                 BufferUploader.draw(bufferBuilder.end());
@@ -221,6 +222,7 @@ public class InspectionScreen {
     }
 
 
+    @SuppressWarnings(value = "deprecation")
     private static void inspect(BlockPos pos, Level level, BlockHitResult hitResult) {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
