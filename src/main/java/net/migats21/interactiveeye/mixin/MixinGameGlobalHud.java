@@ -1,6 +1,7 @@
 package net.migats21.interactiveeye.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import net.migats21.interactiveeye.gui.GlobalHudScreen;
 import net.migats21.interactiveeye.gui.InspectionScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
@@ -22,6 +23,6 @@ public abstract class MixinGameGlobalHud implements ResourceManagerReloadListene
     @Inject(method = "render(FJZ)V", at = @At(value = "TAIL"), locals = LocalCapture.CAPTURE_FAILEXCEPTION)
     public void render(float f, long l, boolean bl, CallbackInfo info) {
         PoseStack poseStack = new PoseStack();
-        InspectionScreen.render(poseStack, minecraft.getDeltaFrameTime());
+        GlobalHudScreen.renderAll(poseStack, minecraft.getDeltaFrameTime());
     }
 }

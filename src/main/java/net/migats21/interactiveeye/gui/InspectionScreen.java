@@ -1,6 +1,8 @@
 package net.migats21.interactiveeye.gui;
 
 import com.google.common.collect.ImmutableSet;
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import net.migats21.interactiveeye.InteractiveEye;
@@ -13,6 +15,7 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.PostChain;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -50,72 +53,55 @@ import java.util.Map;
 import java.util.Objects;
 
 @ParametersAreNonnullByDefault
-public class InspectionScreen {
+public class InspectionScreen extends GlobalHudScreen {
     public static boolean inspecting;
     private static final List<String> inline_data = Lists.newArrayList();
 
-    private static final Minecraft minecraft = Minecraft.getInstance();
-    private static float ani_progress;
-    private static final ShaderInstance SCREEN_SHUTTER_SHADER = createScreenShutterShader();
-
-    @NotNull
-    private static ShaderInstance createScreenShutterShader() {
-        try {
-            return new ShaderInstance(minecraft.getResourceManager(), "screen_shutter", DefaultVertexFormat.POSITION_TEX);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static final Style font = Style.EMPTY.withFont(new ResourceLocation(InteractiveEye.MODID, "rounded"));
-
-    public static void render(PoseStack poseStack, float tickDelta) {
-        if (!inspecting || inline_data.isEmpty()) {
+    RenderTarget renderTarget = new TextureTarget(100, 100, true, true);
+    public void render(PoseStack poseStack, float tickDelta) {
+        if (!RenderSystem.isOnRenderThread() || !inspecting || inline_data.isEmpty()) {
             ani_progress = 0.0f;
             return;
         }
         ani_progress += tickDelta;
         int width = minecraft.getWindow().getGuiScaledWidth();
         int height = minecraft.getWindow().getGuiScaledHeight();
-        int hudsize = (minecraft.font.lineHeight + 2) * inline_data.size();
-        int animated_hudsize = (int) (bezierCurveAnimation(Math.min(ani_progress/8.0f, 1.0f), 0, 0.75f, 1.0f, 1.0f) * hudsize);
+        int hudHeight = (minecraft.font.lineHeight + 2) * inline_data.size();
+        int animated_hudsize = (int) (bezierCurveAnimation(Math.min(ani_progress/8.0f, 1.0f), 0, 0.75f, 1.0f, 1.0f) * hudHeight);
         int x = width / 2 + 98;
         int y = height - animated_hudsize - 4;
-        GuiComponent.fill(poseStack, x, height - 3, width - 2, height - 2, 0xff81e386);
-        GuiComponent.fill(poseStack, x, y, width - 2, height - 3, minecraft.screen == null ? 0x40458a48 : 0xe00f2e11);
-        GuiComponent.fill(poseStack, x, y - 1, width - 2, y, 0xff81e386);
+        int hudWidth = width - 2 - x;
+        renderBackground(poseStack, x, y, hudWidth, animated_hudsize);
         poseStack.translate(0.0, 0.0, 1000.0);
-        if (animated_hudsize == hudsize) {
-            BufferBuilder bufferBuilder = RenderSystem.renderThreadTesselator().getBuilder();
-            MultiBufferSource.BufferSource bufferSource = MultiBufferSource.immediate(bufferBuilder);
+        if (animated_hudsize == hudHeight) {
+            int unscaledHudWidth = (int) (hudWidth * minecraft.getWindow().getGuiScale());
+            int unscaledHudHeight = (int) (hudHeight * minecraft.getWindow().getGuiScale());
+            renderTarget.resize(unscaledHudWidth, unscaledHudHeight, true);
+            minecraft.getMainRenderTarget().unbindWrite();
+            renderTarget.bindWrite(true);
+            RenderSystem.viewport(0, 0, renderTarget.width*2, renderTarget.width);
             for (int i = 0; i < inline_data.size(); i++) {
                 Component styledDataLine = Component.literal(inline_data.get(i)).setStyle(font);
-                minecraft.font.drawInBatch(styledDataLine, width / 2f + 100, height - (minecraft.font.lineHeight + 2) * (inline_data.size() - i) - 2, 0xc0ffffff, false, poseStack.last().pose(), bufferSource, false, 0, 0xF000F0);
+                minecraft.font.draw(poseStack, styledDataLine, 2, hudHeight - (minecraft.font.lineHeight + 2) * (inline_data.size() - i), 0xc0000000);
             }
-            bufferSource.endBatch();
-            bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-            bufferBuilder.vertex(poseStack.last().pose(), x, y, 0.0f).color(0xffffffff).uv(0.0f, 0.0f).endVertex();
-            bufferBuilder.vertex(poseStack.last().pose(), width - 2, y, 0.0f).color(0xffffffff).uv(1.0f, 0.0f).endVertex();
-            bufferBuilder.vertex(poseStack.last().pose(), width - 2, height - 3, 0.0f).color(0xffffffff).uv(1.0f, 1.0f).endVertex();
-            bufferBuilder.vertex(poseStack.last().pose(), x, height - 3, 0.0f).color(0xffffffff).uv(0.0f, 1.0f).endVertex();
-            if (ani_progress < 14.0f) {
-                RenderSystem.setShader(InspectionScreen::getScreenShutterShader);
-                getScreenShutterShader().safeGetUniform("Intensity").set(ani_progress);
-                BufferUploader.drawWithShader(bufferBuilder.end());
-            } else {
-                BufferUploader.draw(bufferBuilder.end());
-            }
+            RenderSystem.viewport(0, 0, minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight());
+            renderTarget.unbindWrite();
+            renderTarget.bindRead();
+            minecraft.getMainRenderTarget().bindWrite(true);
+            renderTarget.blitToScreen((int) renderTarget.width, renderTarget.height, false);
+//            getScreenShutterShader().setSampler("Sampler0", renderTarget.getColorTextureId());
+//            getScreenShutterShader().safeGetUniform("Intensity").set(ani_progress > 14.0f ? 0.0f : ani_progress);
+//            RenderSystem.setShader(this::getScreenShutterShader);
+//            BufferBuilder bufferBuilder = RenderSystem.renderThreadTesselator().getBuilder();
+//            bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+//            bufferBuilder.vertex(poseStack.last().pose(), x, y, 0.0f).uv(0.0f, 0.0f).color(0xffffffff).endVertex();
+//            bufferBuilder.vertex(poseStack.last().pose(), width - 2, y, 0.0f).uv(1.0f, 0.0f).color(0xffffffff).endVertex();
+//            bufferBuilder.vertex(poseStack.last().pose(), width - 2, height - 3, 0.0f).uv(1.0f, 1.0f).color(0xffffffff).endVertex();
+//            bufferBuilder.vertex(poseStack.last().pose(), x, height - 3, 0.0f).uv(0.0f, 1.0f).color(0xffffffff).endVertex();
+//            BufferUploader.draw(bufferBuilder.end());
+//            getScreenShutterShader().clear();
+            renderTarget.unbindRead();
         }
-    }
-
-    @NotNull
-    private static ShaderInstance getScreenShutterShader() {
-        return SCREEN_SHUTTER_SHADER;
-    }
-
-    // Bezier curve formula provided by technobroken
-    private static float bezierCurveAnimation(float t, float c0, float c1, float c2, float c3) {
-        return (float) (Math.pow(t,3)*(c0+3.0f*c1-3.0f*c2+c3) + Math.pow(t,2)*(3.0f*c0-6.0f*c1+3.0f*c2)+t*(-3.0f*c0+3.0f*c1)+c0);
     }
 
     public static void inspect() {
