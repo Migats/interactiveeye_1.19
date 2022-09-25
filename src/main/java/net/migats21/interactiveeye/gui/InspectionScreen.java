@@ -3,7 +3,6 @@ package net.migats21.interactiveeye.gui;
 import com.google.common.collect.ImmutableSet;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import net.migats21.interactiveeye.util.StringMappings;
 import net.minecraft.Util;
@@ -47,8 +46,6 @@ import java.util.Objects;
 public class InspectionScreen extends GlobalHudScreen {
     public static boolean inspecting;
     private static final List<String> inline_data = Lists.newArrayList();
-
-    RenderTarget renderTarget = new TextureTarget(100, 100, true, true);
     public void render(PoseStack poseStack, float tickDelta) {
         if (!inspecting || inline_data.isEmpty()) {
             ani_progress = 0.0f;
@@ -64,33 +61,11 @@ public class InspectionScreen extends GlobalHudScreen {
         int hudWidth = width - 2 - x;
         renderBackground(poseStack, x, y, hudWidth, animated_hudsize);
         poseStack.translate(0.0, 0.0, 1000.0);
-        if (animated_hudsize == hudHeight) {
-            int unscaledWidth = minecraft.getWindow().getWidth();
-            int unscaledHeight = minecraft.getWindow().getHeight();
-            renderTarget.resize(unscaledWidth, unscaledHeight, true);
-            minecraft.getMainRenderTarget().unbindWrite();
-            renderTarget.bindWrite(true);
+        if (ani_progress > 8.0f) {
             for (int i = 0; i < inline_data.size(); i++) {
-                Component styledDataLine = Component.literal(inline_data.get(i)).setStyle(font);
-                minecraft.font.draw(poseStack, styledDataLine, x + 2, height - (minecraft.font.lineHeight + 2) * (inline_data.size() - i) - 2, 0xc0000000);
+                Component styledDataLine = Component.literal(inline_data.get(i)).setStyle(ani_progress > 14.0f ? font : shutteringFonts.get(random.nextInt(8)));
+                minecraft.font.draw(poseStack, styledDataLine, x + 2, height - (minecraft.font.lineHeight + 2) * (inline_data.size() - i) - 2, 0xc0ffffff);
             }
-            renderTarget.unbindWrite();
-            renderTarget.bindRead();
-            minecraft.getMainRenderTarget().bindWrite(true);
-            ShaderInstance shaderInstance = getScreenShutterShader();
-            shaderInstance.setSampler("DiffuseSampler", renderTarget.getColorTextureId());
-            shaderInstance.safeGetUniform("ColorModulator").set(1.0f, 1.0f, 1.0f, 1.0f);
-            shaderInstance.safeGetUniform("Intensity").set(ani_progress > 14.0f ? 0.0f : ani_progress);
-            shaderInstance.apply();
-            BufferBuilder bufferBuilder = new Tesselator().getBuilder();
-            bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
-            bufferBuilder.vertex(poseStack.last().pose(), 0.0f, unscaledHeight, 0.0f).uv(0.0f, 0.0f).color(0xffffffff).endVertex();
-            bufferBuilder.vertex(poseStack.last().pose(), unscaledWidth, unscaledHeight, 0.0f).uv(1.0f, 0.0f).color(0xffffffff).endVertex();
-            bufferBuilder.vertex(poseStack.last().pose(), unscaledWidth, 0.0f, 0.0f).uv(1.0f, 1.0f).color(0xffffffff).endVertex();
-            bufferBuilder.vertex(poseStack.last().pose(), 0.0f, 0.0f, 0.0f).uv(0.0f, 1.0f).color(0xffffffff).endVertex();
-            BufferUploader.draw(bufferBuilder.end());
-            shaderInstance.clear();
-            renderTarget.unbindRead();
         }
     }
 

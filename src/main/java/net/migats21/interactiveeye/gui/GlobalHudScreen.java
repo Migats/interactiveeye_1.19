@@ -1,40 +1,35 @@
 package net.migats21.interactiveeye.gui;
 
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.google.common.collect.Sets;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.migats21.interactiveeye.InteractiveEye;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiComponent;
-import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.resources.ResourceProvider;
+import net.minecraft.util.RandomSource;
+import org.apache.commons.compress.utils.Lists;
 
-import java.io.IOException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 public abstract class GlobalHudScreen extends GuiComponent {
-    private static GlobalHudScreen inspectionScreen = new InspectionScreen();
-    protected static Style font = Style.EMPTY.withFont(new ResourceLocation(InteractiveEye.MODID, "rounded"));
-    protected static final Minecraft minecraft = Minecraft.getInstance();
+    private static GlobalHudScreen inspectionScreen;
+    protected static Style font;
+    protected static List<Style> shutteringFonts = Lists.newArrayList();
+    protected static RandomSource random;
+    protected static Minecraft minecraft;
     protected float ani_progress;
-    private static ShaderInstance screenShutterShader;
 
-    private static ShaderInstance createScreenShutterShader(ResourceManager resourceManager) {
-        try {
-            return new ShaderInstance(resourceManager, "screen_shutter", DefaultVertexFormat.POSITION_TEX);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+    public static void init() {
+        minecraft = Minecraft.getInstance();
+        font = Style.EMPTY.withFont(new ResourceLocation(InteractiveEye.MODID, "rounded"));
+        random = RandomSource.createNewThreadLocalInstance();
+        for(int i=0;i<8;i++) {
+            shutteringFonts.add(Style.EMPTY.withFont(new ResourceLocation(InteractiveEye.MODID, "rounded_shuttering"+i)));
         }
-    }
-
-    public static void reloadShaders(ResourceManager resourceManager) {
-        if (screenShutterShader != null) screenShutterShader.close();
-        screenShutterShader = createScreenShutterShader(resourceManager);
-    }
-
-    protected ShaderInstance getScreenShutterShader() {
-        return screenShutterShader;
+        inspectionScreen = new InspectionScreen();
     }
 
     public static void renderAll(PoseStack poseStack, float deltaFrameTime) {

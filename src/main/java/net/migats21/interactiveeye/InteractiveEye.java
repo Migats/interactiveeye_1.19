@@ -17,5 +17,6 @@ public class InteractiveEye implements ClientModInitializer {
     public void onInitializeClient() {
         KeyInputHandler.register();
         StringMappings.init();
+        GlobalHudScreen.init();
     }
 }

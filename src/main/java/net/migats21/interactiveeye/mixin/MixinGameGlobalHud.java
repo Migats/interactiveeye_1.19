@@ -26,8 +26,4 @@ public abstract class MixinGameGlobalHud implements ResourceManagerReloadListene
         PoseStack poseStack = new PoseStack();
         GlobalHudScreen.renderAll(poseStack, minecraft.getDeltaFrameTime());
     }
-    @Inject(method = "reloadShaders(Lnet/minecraft/server/packs/resources/ResourceManager;)V", at = @At(value = "TAIL"))
-    public void reloadUiShader(ResourceManager resourceManager, CallbackInfo info) {
-        GlobalHudScreen.reloadShaders(resourceManager);
-    }
 }
