@@ -5,23 +5,16 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
-import net.migats21.interactiveeye.InteractiveEye;
 import net.migats21.interactiveeye.util.StringMappings;
 import net.minecraft.Util;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiComponent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.PostChain;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -44,10 +37,8 @@ import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import org.apache.commons.compress.utils.Lists;
-import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.ParametersAreNonnullByDefault;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -59,7 +50,7 @@ public class InspectionScreen extends GlobalHudScreen {
 
     RenderTarget renderTarget = new TextureTarget(100, 100, true, true);
     public void render(PoseStack poseStack, float tickDelta) {
-        if (!RenderSystem.isOnRenderThread() || !inspecting || inline_data.isEmpty()) {
+        if (!inspecting || inline_data.isEmpty()) {
             ani_progress = 0.0f;
             return;
         }
@@ -74,32 +65,31 @@ public class InspectionScreen extends GlobalHudScreen {
         renderBackground(poseStack, x, y, hudWidth, animated_hudsize);
         poseStack.translate(0.0, 0.0, 1000.0);
         if (animated_hudsize == hudHeight) {
-            int unscaledHudWidth = (int) (hudWidth * minecraft.getWindow().getGuiScale());
-            int unscaledHudHeight = (int) (hudHeight * minecraft.getWindow().getGuiScale());
-            renderTarget.resize(unscaledHudWidth, unscaledHudHeight, true);
+            int unscaledWidth = minecraft.getWindow().getWidth();
+            int unscaledHeight = minecraft.getWindow().getHeight();
+            renderTarget.resize(unscaledWidth, unscaledHeight, true);
             minecraft.getMainRenderTarget().unbindWrite();
             renderTarget.bindWrite(true);
-            RenderSystem.viewport(0, 0, renderTarget.width*2, renderTarget.width);
             for (int i = 0; i < inline_data.size(); i++) {
                 Component styledDataLine = Component.literal(inline_data.get(i)).setStyle(font);
-                minecraft.font.draw(poseStack, styledDataLine, 2, hudHeight - (minecraft.font.lineHeight + 2) * (inline_data.size() - i), 0xc0000000);
+                minecraft.font.draw(poseStack, styledDataLine, x + 2, height - (minecraft.font.lineHeight + 2) * (inline_data.size() - i) - 2, 0xc0000000);
             }
-            RenderSystem.viewport(0, 0, minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight());
             renderTarget.unbindWrite();
             renderTarget.bindRead();
             minecraft.getMainRenderTarget().bindWrite(true);
-            renderTarget.blitToScreen((int) renderTarget.width, renderTarget.height, false);
-//            getScreenShutterShader().setSampler("Sampler0", renderTarget.getColorTextureId());
-//            getScreenShutterShader().safeGetUniform("Intensity").set(ani_progress > 14.0f ? 0.0f : ani_progress);
-//            RenderSystem.setShader(this::getScreenShutterShader);
-//            BufferBuilder bufferBuilder = RenderSystem.renderThreadTesselator().getBuilder();
-//            bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
-//            bufferBuilder.vertex(poseStack.last().pose(), x, y, 0.0f).uv(0.0f, 0.0f).color(0xffffffff).endVertex();
-//            bufferBuilder.vertex(poseStack.last().pose(), width - 2, y, 0.0f).uv(1.0f, 0.0f).color(0xffffffff).endVertex();
-//            bufferBuilder.vertex(poseStack.last().pose(), width - 2, height - 3, 0.0f).uv(1.0f, 1.0f).color(0xffffffff).endVertex();
-//            bufferBuilder.vertex(poseStack.last().pose(), x, height - 3, 0.0f).uv(0.0f, 1.0f).color(0xffffffff).endVertex();
-//            BufferUploader.draw(bufferBuilder.end());
-//            getScreenShutterShader().clear();
+            ShaderInstance shaderInstance = getScreenShutterShader();
+            shaderInstance.setSampler("DiffuseSampler", renderTarget.getColorTextureId());
+            shaderInstance.safeGetUniform("ColorModulator").set(1.0f, 1.0f, 1.0f, 1.0f);
+            shaderInstance.safeGetUniform("Intensity").set(ani_progress > 14.0f ? 0.0f : ani_progress);
+            shaderInstance.apply();
+            BufferBuilder bufferBuilder = new Tesselator().getBuilder();
+            bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+            bufferBuilder.vertex(poseStack.last().pose(), 0.0f, unscaledHeight, 0.0f).uv(0.0f, 0.0f).color(0xffffffff).endVertex();
+            bufferBuilder.vertex(poseStack.last().pose(), unscaledWidth, unscaledHeight, 0.0f).uv(1.0f, 0.0f).color(0xffffffff).endVertex();
+            bufferBuilder.vertex(poseStack.last().pose(), unscaledWidth, 0.0f, 0.0f).uv(1.0f, 1.0f).color(0xffffffff).endVertex();
+            bufferBuilder.vertex(poseStack.last().pose(), 0.0f, 0.0f, 0.0f).uv(0.0f, 1.0f).color(0xffffffff).endVertex();
+            BufferUploader.draw(bufferBuilder.end());
+            shaderInstance.clear();
             renderTarget.unbindRead();
         }
     }

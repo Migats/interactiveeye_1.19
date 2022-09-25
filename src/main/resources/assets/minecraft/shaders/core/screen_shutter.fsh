@@ -1,22 +1,21 @@
 #version 150
 
-uniform sampler2D Sampler0;
+uniform sampler2D DiffuseSampler;
 
 uniform vec4 ColorModulator;
 
 uniform float Intensity;
 
-in vec2 texCoord0;
+in vec2 texCoord;
+in vec4 vertexColor;
 
 out vec4 fragColor;
 
 void main()
 {
-    vec2 shaded_uv = vec2(texCoord0.x+mod(floor(texCoord0.y/0.01)*Intensity, 0.1), texCoord0.y);
-    vec4 color = texture(Sampler0,shaded_uv);
-    if (color.a == 0.0) {
-        color.a = 0.0;
-    }
-    fragColor = color * ColorModulator * vec4(1.0, 0.0, 1.0, 1.0);
+    //vec2 shaded_uv = vec2(texCoord.x+mod(floor(texCoord.y/0.01)*Intensity, 0.1), texCoord.y);
+    vec4 color = texture(DiffuseSampler, texCoord) * vertexColor;
 
+    // blit final output of compositor into displayed back buffer
+    fragColor = color * ColorModulator;
 }

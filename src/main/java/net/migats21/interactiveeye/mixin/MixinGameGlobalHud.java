@@ -2,10 +2,11 @@ package net.migats21.interactiveeye.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.migats21.interactiveeye.gui.GlobalHudScreen;
-import net.migats21.interactiveeye.gui.InspectionScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
+import net.minecraft.server.packs.resources.ResourceProvider;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -24,5 +25,9 @@ public abstract class MixinGameGlobalHud implements ResourceManagerReloadListene
     public void render(float f, long l, boolean bl, CallbackInfo info) {
         PoseStack poseStack = new PoseStack();
         GlobalHudScreen.renderAll(poseStack, minecraft.getDeltaFrameTime());
+    }
+    @Inject(method = "reloadShaders(Lnet/minecraft/server/packs/resources/ResourceManager;)V", at = @At(value = "TAIL"))
+    public void reloadUiShader(ResourceManager resourceManager, CallbackInfo info) {
+        GlobalHudScreen.reloadShaders(resourceManager);
     }
 }
