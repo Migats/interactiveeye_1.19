@@ -23,7 +23,9 @@ public abstract class MixinGameGlobalHud implements ResourceManagerReloadListene
     // TODO: Fix tooltip overlapping the inspection screen
     @Inject(method = "render(FJZ)V", at = @At(value = "TAIL"), locals = LocalCapture.CAPTURE_FAILEXCEPTION)
     public void render(float f, long l, boolean bl, CallbackInfo info) {
-        PoseStack poseStack = new PoseStack();
-        GlobalHudScreen.renderAll(poseStack, minecraft.getDeltaFrameTime());
+        if (this.minecraft.level != null && (minecraft.screen == null || !minecraft.screen.isPauseScreen())) {
+            PoseStack poseStack = new PoseStack();
+            GlobalHudScreen.renderAll(poseStack, minecraft.getDeltaFrameTime());
+        }
     }
 }

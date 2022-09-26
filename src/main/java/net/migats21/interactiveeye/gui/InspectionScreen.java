@@ -1,8 +1,6 @@
 package net.migats21.interactiveeye.gui;
 
 import com.google.common.collect.ImmutableSet;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.vertex.*;
 import net.migats21.interactiveeye.util.StringMappings;
 import net.minecraft.Util;
@@ -10,7 +8,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
-import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -45,31 +42,39 @@ import java.util.Objects;
 @ParametersAreNonnullByDefault
 public class InspectionScreen extends GlobalHudScreen {
     public static boolean inspecting;
-    private static final List<String> inline_data = Lists.newArrayList();
-    public void render(PoseStack poseStack, float tickDelta) {
+    private final List<String> inline_data = Lists.newArrayList();
+
+    @Override
+    protected void show() {
+        if (!inspecting) {
+            inspect();
+        }
+    }
+
+    public void render(PoseStack poseStack, float tickDelta, int width, int height) {
         if (!inspecting || inline_data.isEmpty()) {
             ani_progress = 0.0f;
             return;
         }
         ani_progress += tickDelta;
-        int width = minecraft.getWindow().getGuiScaledWidth();
-        int height = minecraft.getWindow().getGuiScaledHeight();
         int hudHeight = (minecraft.font.lineHeight + 2) * inline_data.size();
-        int animated_hudsize = (int) (bezierCurveAnimation(Math.min(ani_progress/8.0f, 1.0f), 0, 0.75f, 1.0f, 1.0f) * hudHeight);
+        int animatedHudHeight = (int) (bezierCurveAnimation(Math.min(ani_progress/8.0f, 1.0f), 0, 0.75f, 1.0f, 1.0f) * hudHeight);
         int x = width / 2 + 98;
-        int y = height - animated_hudsize - 4;
+        int y = height - animatedHudHeight - 4;
         int hudWidth = width - 2 - x;
-        renderBackground(poseStack, x, y, hudWidth, animated_hudsize);
-        poseStack.translate(0.0, 0.0, 1000.0);
+        renderBackground(poseStack, x, y, hudWidth, animatedHudHeight);
         if (ani_progress > 8.0f) {
+            poseStack.pushPose();
+            poseStack.translate(0.0, 0.0, 1000.0);
             for (int i = 0; i < inline_data.size(); i++) {
-                Component styledDataLine = Component.literal(inline_data.get(i)).setStyle(ani_progress > 14.0f ? font : shutteringFonts.get(random.nextInt(8)));
+                Component styledDataLine = Component.literal(inline_data.get(i)).setStyle(font);
                 minecraft.font.draw(poseStack, styledDataLine, x + 2, height - (minecraft.font.lineHeight + 2) * (inline_data.size() - i) - 2, 0xc0ffffff);
             }
+            poseStack.popPose();
         }
     }
 
-    public static void inspect() {
+    public void inspect() {
         inline_data.clear();
         if (minecraft.level != null) {
             if (minecraft.screen == null) {
@@ -80,7 +85,7 @@ public class InspectionScreen extends GlobalHudScreen {
         }
     }
 
-    public static void inspect(Level level) {
+    public void inspect(Level level) {
         switch (minecraft.hitResult.getType()) {
             case ENTITY -> inspect(((EntityHitResult) minecraft.hitResult).getEntity());
             case BLOCK -> inspect(((BlockHitResult) minecraft.hitResult).getBlockPos(), level, (BlockHitResult)minecraft.hitResult);
@@ -95,7 +100,7 @@ public class InspectionScreen extends GlobalHudScreen {
         }
     }
 
-    private static void inspect(Screen screen) {
+    private void inspect(Screen screen) {
         if (screen instanceof AbstractContainerScreen<?> containerScreen) {
             if (screen instanceof EffectRenderingInventoryScreen<?>) {
                 if (screen instanceof CreativeModeInventoryScreen creativeScreen) {
@@ -172,13 +177,14 @@ public class InspectionScreen extends GlobalHudScreen {
         }
     }
 
-
     @SuppressWarnings(value = "deprecation")
-    private static void inspect(BlockPos pos, Level level, BlockHitResult hitResult) {
+    private void inspect(BlockPos pos, Level level, BlockHitResult hitResult) {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
         inline_data.add("Block: " + block.getName().getString());
-        inline_data.add("Type: " + Objects.requireNonNullElse(StringMappings.materials.get(state.getMaterial()), "unknown"));
+        inline_data.add("Type: " + Component.translatable("materials." +
+                Objects.requireNonNullElse(StringMappings.materials.get(state.getMaterial()), "unknown")
+        ).getString());
         ItemStack handItem = minecraft.player.getMainHandItem();
         if (handItem.is(Items.FILLED_MAP) || handItem.is(Items.MAP)) {
             inline_data.add("Color: " + Objects.requireNonNullElse(StringMappings.materialColors.get(state.getMapColor(level, pos)), "unknown"));
@@ -239,7 +245,7 @@ public class InspectionScreen extends GlobalHudScreen {
         }
     }
 
-    public static void inspect(Entity entity) {
+    public void inspect(Entity entity) {
         inline_data.add("Name: " + entity.getType().getDescription().getString());
         if (entity.getType() == EntityType.ENDER_DRAGON || entity.getType() == EntityType.WITHER) {
             inline_data.add("Type: boss");
