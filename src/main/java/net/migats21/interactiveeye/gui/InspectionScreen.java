@@ -1,7 +1,7 @@
 package net.migats21.interactiveeye.gui;
 
 import com.google.common.collect.ImmutableSet;
-import com.mojang.blaze3d.vertex.*;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.migats21.interactiveeye.util.StringMappings;
 import net.minecraft.Util;
 import net.minecraft.client.gui.screens.Screen;
@@ -19,6 +19,7 @@ import net.minecraft.world.entity.NeutralMob;
 import net.minecraft.world.entity.ambient.AmbientCreature;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.npc.Npc;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.BlockItem;
@@ -27,11 +28,14 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.*;
+import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.Vec3;
 import org.apache.commons.compress.utils.Lists;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -190,6 +194,9 @@ public class InspectionScreen extends GlobalHudScreen {
             inline_data.add("Color: " + Objects.requireNonNullElse(StringMappings.materialColors.get(state.getMapColor(level, pos)), "unknown"));
         }
         float breakspeed = 0.05f / block.getDestroyProgress(state, minecraft.player, level, pos);
+        if (state.requiresCorrectToolForDrops()) {
+            inline_data.add(minecraft.player.hasCorrectToolForDrops(state) ? "Can drop with tool" : "Incorrect tool");
+        }
         if (breakspeed == Float.POSITIVE_INFINITY) {
             inline_data.add("Unbreakable");
         } else if (breakspeed == 0.0f) {
@@ -197,15 +204,65 @@ public class InspectionScreen extends GlobalHudScreen {
         } else {
             inline_data.add("Break in: " + String.format("%.02f", breakspeed) + "sec");
         }
+        if (!state.canSurvive(level, pos)) {
+            inline_data.add("Illegal state");
+        }
+        if (block instanceof BedBlock) {
+            BlockPos blockPos = pos.relative(BedBlock.getConnectedDirection(state));
+            /*double d = 1.0 - (double)(level.getRainLevel(1.0f) * 5.0f) / 16.0;
+            double e = 1.0 - (double)(level.getThunderLevel(1.0f) * 5.0f) / 16.0;
+            double f = 0.5 + 2.0 * Mth.clamp((double)Mth.cos(level.getTimeOfDay(1.0f) * ((float)Math.PI * 2)), -0.25, 0.25);
+            int skyDarken = (int)((1.0 - f * d * e) * 11.0);*/
+            level.updateSkyBrightness();
+            Vec3 vec3 = Vec3.atBottomCenterOf(pos);
+            inline_data.add(
+                !BedBlock.canSetSpawn(level) ? "Explodes on click" :
+                state.getValue(BedBlock.OCCUPIED) || minecraft.player.isSleeping() || !minecraft.player.isAlive() ? "Occupied" :
+                !level.dimensionType().natural() ? "Can't sleep in dimension" :
+                level.getBlockState(pos.above()).isSuffocating(level, pos.above()) || level.getBlockState(blockPos.above()).isSuffocating(level, blockPos.above()) ? "Obstructed" :
+                level.isDay() ? "No nighttime" :
+                level.getEntitiesOfClass(Monster.class, new AABB(vec3.x() - 9.0, vec3.y() - 5.0, vec3.z() - 9.0, vec3.x() + 9.0, vec3.y() + 5.0, vec3.z() + 9.0), monster -> monster.isPreventingPlayerRest(minecraft.player)).isEmpty() ? "Can sleep" : "Monster nearby"
+            );
+        } else if (block instanceof RespawnAnchorBlock) {
+            inline_data.add(RespawnAnchorBlock.canSetSpawn(level) ? "Can set spawn" : "Explodes on charge");
+        } else if (block instanceof BeehiveBlock && level.getBlockEntity(pos) instanceof BeehiveBlockEntity entity) {
+            inline_data.add(CampfireBlock.isSmokeyPos(level, pos) ? "Safe to harvest" : "Unsafe to harvest");
+        }
         if (!state.getValues().isEmpty()) {
             inline_data.add("");
             inline_data.add("Blockstate properties:");
             ImmutableSet<Map.Entry<Property<?>, Comparable<?>>> stateentries = state.getValues().entrySet();
             for (Map.Entry<Property<?>, Comparable<?>> entry : stateentries) {
                 Property<?> property = entry.getKey();
-                inline_data.add("  " + property.getName() + ": " + Util.getPropertyName(property, entry.getValue()));
+                inline_data.add("  " + property.getName() + ": " + Objects.requireNonNullElse(StringMappings.propertyValues.get(property), String::valueOf).apply(Util.getPropertyName(property, entry.getValue())));
             }
         }
+        int redstoneSignal = level.getSignal(pos, hitResult.getDirection().getOpposite());
+        int analogSignal = state.getAnalogOutputSignal(level, pos);
+        if (redstoneSignal > 0) {
+            inline_data.add("");
+            inline_data.add("Redstone signal: " + redstoneSignal);
+            if (state.isRedstoneConductor(level, pos) && level.getDirectSignalTo(pos) == redstoneSignal) {
+                for(Direction direction : Direction.values()) {
+                    BlockPos blockPos = pos.relative(direction);
+                    if (level.getDirectSignal(blockPos, direction) == redstoneSignal) {
+                        inline_data.add("From: " + level.getBlockState(blockPos).getBlock().getName().getString());
+                        break;
+                    }
+                }
+            } else if (state.isSignalSource()) {
+                inline_data.add("Power from source");
+            } else {
+                inline_data.add("Quazi powered");
+            }
+            if (state.hasAnalogOutputSignal()) {
+                inline_data.add("Comparator signal: " + state.getAnalogOutputSignal(level, pos));
+            }
+        } else if (state.hasAnalogOutputSignal() && analogSignal > 0) {
+            inline_data.add("");
+            inline_data.add("Comparator signal: " + state.getAnalogOutputSignal(level, pos));
+        }
+
         if (!handItem.isEmpty()) {
             if (handItem.getItem() instanceof BlockItem blockItem) {
                 BlockPlaceContext placeContext = new BlockPlaceContext(minecraft.player, InteractionHand.MAIN_HAND, minecraft.player.getMainHandItem(), hitResult);
@@ -217,30 +274,12 @@ public class InspectionScreen extends GlobalHudScreen {
                         ImmutableSet<Map.Entry<Property<?>, Comparable<?>>> stateentries = placingState.getValues().entrySet();
                         for (Map.Entry<Property<?>, Comparable<?>> entry : stateentries) {
                             Property<?> property = entry.getKey();
-                            inline_data.add("  " + property.getName() + ": " + Util.getPropertyName(property, entry.getValue()));
+                            inline_data.add("  " + property.getName() + ": " + Objects.requireNonNullElse(StringMappings.propertyValues.get(property), String::valueOf).apply(Util.getPropertyName(property, entry.getValue())));
                         }
                     }
                 } else {
                     inline_data.add("Cannot be placed");
                 }
-            }
-        }
-        int redstoneSignal = level.getSignal(pos, hitResult.getDirection().getOpposite());
-        if (redstoneSignal > 0) {
-            inline_data.add("");
-            inline_data.add("Redstone signal: " + redstoneSignal);
-            if (state.isRedstoneConductor(level, pos) && level.getDirectSignalTo(pos) == redstoneSignal) {
-                for(Direction direction : Direction.values()) {
-                    BlockPos blockPos = pos.relative(direction);
-                    if (level.getDirectSignal(blockPos, direction) == redstoneSignal) {
-                        inline_data.add("Powered by: " + level.getBlockState(blockPos).getBlock().getName().getString());
-                        break;
-                    }
-                }
-            } else if (state.isSignalSource()) {
-                inline_data.add("Power from source");
-            } else {
-                inline_data.add("Quazi powered");
             }
         }
     }
