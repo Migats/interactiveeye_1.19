@@ -1,24 +1,16 @@
 package net.migats21.interactiveeye.gui;
 
 import com.google.common.collect.ImmutableSet;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.*;
-import net.migats21.interactiveeye.InteractiveEye;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.migats21.interactiveeye.util.StringMappings;
 import net.minecraft.Util;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiComponent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -27,6 +19,7 @@ import net.minecraft.world.entity.NeutralMob;
 import net.minecraft.world.entity.ambient.AmbientCreature;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.npc.Npc;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.BlockItem;
@@ -35,90 +28,57 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.*;
+import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.Vec3;
 import org.apache.commons.compress.utils.Lists;
-import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.ParametersAreNonnullByDefault;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 @ParametersAreNonnullByDefault
-public class InspectionScreen {
+public class InspectionScreen extends GlobalHudScreen {
     public static boolean inspecting;
-    private static final List<String> inline_data = Lists.newArrayList();
+    private final List<String> inline_data = Lists.newArrayList();
 
-    private static final Minecraft minecraft = Minecraft.getInstance();
-    private static float ani_progress;
-    private static final ShaderInstance SCREEN_SHUTTER_SHADER = createScreenShutterShader();
-
-    @NotNull
-    private static ShaderInstance createScreenShutterShader() {
-        try {
-            return new ShaderInstance(minecraft.getResourceManager(), "screen_shutter", DefaultVertexFormat.POSITION_TEX);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+    @Override
+    protected void show() {
+        if (!inspecting) {
+            inspect();
         }
     }
 
-    private static final Style font = Style.EMPTY.withFont(new ResourceLocation(InteractiveEye.MODID, "rounded"));
-
-    public static void render(PoseStack poseStack, float tickDelta) {
+    public void render(PoseStack poseStack, float tickDelta, int width, int height) {
         if (!inspecting || inline_data.isEmpty()) {
             ani_progress = 0.0f;
             return;
         }
         ani_progress += tickDelta;
-        int width = minecraft.getWindow().getGuiScaledWidth();
-        int height = minecraft.getWindow().getGuiScaledHeight();
-        int hudsize = (minecraft.font.lineHeight + 2) * inline_data.size();
-        int animated_hudsize = (int) (bezierCurveAnimation(Math.min(ani_progress/8.0f, 1.0f), 0, 0.75f, 1.0f, 1.0f) * hudsize);
+        int hudHeight = (minecraft.font.lineHeight + 2) * inline_data.size();
+        int animatedHudHeight = (int) (bezierCurveAnimation(Math.min(ani_progress/8.0f, 1.0f), 0, 0.75f, 1.0f, 1.0f) * hudHeight);
         int x = width / 2 + 98;
-        int y = height - animated_hudsize - 4;
-        GuiComponent.fill(poseStack, x, height - 3, width - 2, height - 2, 0xff81e386);
-        GuiComponent.fill(poseStack, x, y, width - 2, height - 3, minecraft.screen == null ? 0x40458a48 : 0xe00f2e11);
-        GuiComponent.fill(poseStack, x, y - 1, width - 2, y, 0xff81e386);
-        poseStack.translate(0.0, 0.0, 1000.0);
-        if (animated_hudsize == hudsize) {
-            BufferBuilder bufferBuilder = RenderSystem.renderThreadTesselator().getBuilder();
-            MultiBufferSource.BufferSource bufferSource = MultiBufferSource.immediate(bufferBuilder);
+        int y = height - animatedHudHeight - 4;
+        int hudWidth = width - 2 - x;
+        renderBackground(poseStack, x, y, hudWidth, animatedHudHeight);
+        if (ani_progress > 8.0f) {
+            poseStack.pushPose();
+            poseStack.translate(0.0, 0.0, 1000.0);
             for (int i = 0; i < inline_data.size(); i++) {
                 Component styledDataLine = Component.literal(inline_data.get(i)).setStyle(font);
-                minecraft.font.drawInBatch(styledDataLine, width / 2f + 100, height - (minecraft.font.lineHeight + 2) * (inline_data.size() - i) - 2, 0xc0ffffff, false, poseStack.last().pose(), bufferSource, false, 0, 0xF000F0);
+                minecraft.font.draw(poseStack, styledDataLine, x + 2, height - (minecraft.font.lineHeight + 2) * (inline_data.size() - i) - 2, 0xc0ffffff);
             }
-            bufferSource.endBatch();
-            bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-            bufferBuilder.vertex(poseStack.last().pose(), x, y, 0.0f).color(0xffffffff).uv(0.0f, 0.0f).endVertex();
-            bufferBuilder.vertex(poseStack.last().pose(), width - 2, y, 0.0f).color(0xffffffff).uv(1.0f, 0.0f).endVertex();
-            bufferBuilder.vertex(poseStack.last().pose(), width - 2, height - 3, 0.0f).color(0xffffffff).uv(1.0f, 1.0f).endVertex();
-            bufferBuilder.vertex(poseStack.last().pose(), x, height - 3, 0.0f).color(0xffffffff).uv(0.0f, 1.0f).endVertex();
-            if (ani_progress < 14.0f) {
-                RenderSystem.setShader(InspectionScreen::getScreenShutterShader);
-                getScreenShutterShader().safeGetUniform("Intensity").set(ani_progress);
-                BufferUploader.drawWithShader(bufferBuilder.end());
-            } else {
-                BufferUploader.draw(bufferBuilder.end());
-            }
+            poseStack.popPose();
         }
     }
 
-    @NotNull
-    private static ShaderInstance getScreenShutterShader() {
-        return SCREEN_SHUTTER_SHADER;
-    }
-
-    // Bezier curve formula provided by technobroken
-    private static float bezierCurveAnimation(float t, float c0, float c1, float c2, float c3) {
-        return (float) (Math.pow(t,3)*(c0+3.0f*c1-3.0f*c2+c3) + Math.pow(t,2)*(3.0f*c0-6.0f*c1+3.0f*c2)+t*(-3.0f*c0+3.0f*c1)+c0);
-    }
-
-    public static void inspect() {
+    public void inspect() {
         inline_data.clear();
         if (minecraft.level != null) {
             if (minecraft.screen == null) {
@@ -129,7 +89,7 @@ public class InspectionScreen {
         }
     }
 
-    public static void inspect(Level level) {
+    public void inspect(Level level) {
         switch (minecraft.hitResult.getType()) {
             case ENTITY -> inspect(((EntityHitResult) minecraft.hitResult).getEntity());
             case BLOCK -> inspect(((BlockHitResult) minecraft.hitResult).getBlockPos(), level, (BlockHitResult)minecraft.hitResult);
@@ -144,7 +104,7 @@ public class InspectionScreen {
         }
     }
 
-    private static void inspect(Screen screen) {
+    private void inspect(Screen screen) {
         if (screen instanceof AbstractContainerScreen<?> containerScreen) {
             if (screen instanceof EffectRenderingInventoryScreen<?>) {
                 if (screen instanceof CreativeModeInventoryScreen creativeScreen) {
@@ -221,18 +181,22 @@ public class InspectionScreen {
         }
     }
 
-
     @SuppressWarnings(value = "deprecation")
-    private static void inspect(BlockPos pos, Level level, BlockHitResult hitResult) {
+    private void inspect(BlockPos pos, Level level, BlockHitResult hitResult) {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
         inline_data.add("Block: " + block.getName().getString());
-        inline_data.add("Type: " + Objects.requireNonNullElse(StringMappings.materials.get(state.getMaterial()), "unknown"));
+        inline_data.add("Type: " + Component.translatable("materials." +
+                Objects.requireNonNullElse(StringMappings.materials.get(state.getMaterial()), "unknown")
+        ).getString());
         ItemStack handItem = minecraft.player.getMainHandItem();
         if (handItem.is(Items.FILLED_MAP) || handItem.is(Items.MAP)) {
             inline_data.add("Color: " + Objects.requireNonNullElse(StringMappings.materialColors.get(state.getMapColor(level, pos)), "unknown"));
         }
         float breakspeed = 0.05f / block.getDestroyProgress(state, minecraft.player, level, pos);
+        if (state.requiresCorrectToolForDrops()) {
+            inline_data.add(minecraft.player.hasCorrectToolForDrops(state) ? "Can drop with tool" : "Incorrect tool");
+        }
         if (breakspeed == Float.POSITIVE_INFINITY) {
             inline_data.add("Unbreakable");
         } else if (breakspeed == 0.0f) {
@@ -240,15 +204,65 @@ public class InspectionScreen {
         } else {
             inline_data.add("Break in: " + String.format("%.02f", breakspeed) + "sec");
         }
+        if (!state.canSurvive(level, pos)) {
+            inline_data.add("Illegal state");
+        }
+        if (block instanceof BedBlock) {
+            BlockPos blockPos = pos.relative(BedBlock.getConnectedDirection(state));
+            /*double d = 1.0 - (double)(level.getRainLevel(1.0f) * 5.0f) / 16.0;
+            double e = 1.0 - (double)(level.getThunderLevel(1.0f) * 5.0f) / 16.0;
+            double f = 0.5 + 2.0 * Mth.clamp((double)Mth.cos(level.getTimeOfDay(1.0f) * ((float)Math.PI * 2)), -0.25, 0.25);
+            int skyDarken = (int)((1.0 - f * d * e) * 11.0);*/
+            level.updateSkyBrightness();
+            Vec3 vec3 = Vec3.atBottomCenterOf(pos);
+            inline_data.add(
+                !BedBlock.canSetSpawn(level) ? "Explodes on click" :
+                state.getValue(BedBlock.OCCUPIED) || minecraft.player.isSleeping() || !minecraft.player.isAlive() ? "Occupied" :
+                !level.dimensionType().natural() ? "Can't sleep in dimension" :
+                level.getBlockState(pos.above()).isSuffocating(level, pos.above()) || level.getBlockState(blockPos.above()).isSuffocating(level, blockPos.above()) ? "Obstructed" :
+                level.isDay() ? "No nighttime" :
+                level.getEntitiesOfClass(Monster.class, new AABB(vec3.x() - 9.0, vec3.y() - 5.0, vec3.z() - 9.0, vec3.x() + 9.0, vec3.y() + 5.0, vec3.z() + 9.0), monster -> monster.isPreventingPlayerRest(minecraft.player)).isEmpty() ? "Can sleep" : "Monster nearby"
+            );
+        } else if (block instanceof RespawnAnchorBlock) {
+            inline_data.add(RespawnAnchorBlock.canSetSpawn(level) ? "Can set spawn" : "Explodes on charge");
+        } else if (block instanceof BeehiveBlock && level.getBlockEntity(pos) instanceof BeehiveBlockEntity entity) {
+            inline_data.add(CampfireBlock.isSmokeyPos(level, pos) ? "Safe to harvest" : "Unsafe to harvest");
+        }
         if (!state.getValues().isEmpty()) {
             inline_data.add("");
             inline_data.add("Blockstate properties:");
             ImmutableSet<Map.Entry<Property<?>, Comparable<?>>> stateentries = state.getValues().entrySet();
             for (Map.Entry<Property<?>, Comparable<?>> entry : stateentries) {
                 Property<?> property = entry.getKey();
-                inline_data.add("  " + property.getName() + ": " + Util.getPropertyName(property, entry.getValue()));
+                inline_data.add("  " + property.getName() + ": " + Objects.requireNonNullElse(StringMappings.propertyValues.get(property), String::valueOf).apply(Util.getPropertyName(property, entry.getValue())));
             }
         }
+        int redstoneSignal = level.getSignal(pos, hitResult.getDirection().getOpposite());
+        int analogSignal = state.getAnalogOutputSignal(level, pos);
+        if (redstoneSignal > 0) {
+            inline_data.add("");
+            inline_data.add("Redstone signal: " + redstoneSignal);
+            if (state.isRedstoneConductor(level, pos) && level.getDirectSignalTo(pos) == redstoneSignal) {
+                for(Direction direction : Direction.values()) {
+                    BlockPos blockPos = pos.relative(direction);
+                    if (level.getDirectSignal(blockPos, direction) == redstoneSignal) {
+                        inline_data.add("From: " + level.getBlockState(blockPos).getBlock().getName().getString());
+                        break;
+                    }
+                }
+            } else if (state.isSignalSource()) {
+                inline_data.add("Power from source");
+            } else {
+                inline_data.add("Quazi powered");
+            }
+            if (state.hasAnalogOutputSignal()) {
+                inline_data.add("Comparator signal: " + state.getAnalogOutputSignal(level, pos));
+            }
+        } else if (state.hasAnalogOutputSignal() && analogSignal > 0) {
+            inline_data.add("");
+            inline_data.add("Comparator signal: " + state.getAnalogOutputSignal(level, pos));
+        }
+
         if (!handItem.isEmpty()) {
             if (handItem.getItem() instanceof BlockItem blockItem) {
                 BlockPlaceContext placeContext = new BlockPlaceContext(minecraft.player, InteractionHand.MAIN_HAND, minecraft.player.getMainHandItem(), hitResult);
@@ -260,7 +274,7 @@ public class InspectionScreen {
                         ImmutableSet<Map.Entry<Property<?>, Comparable<?>>> stateentries = placingState.getValues().entrySet();
                         for (Map.Entry<Property<?>, Comparable<?>> entry : stateentries) {
                             Property<?> property = entry.getKey();
-                            inline_data.add("  " + property.getName() + ": " + Util.getPropertyName(property, entry.getValue()));
+                            inline_data.add("  " + property.getName() + ": " + Objects.requireNonNullElse(StringMappings.propertyValues.get(property), String::valueOf).apply(Util.getPropertyName(property, entry.getValue())));
                         }
                     }
                 } else {
@@ -268,27 +282,9 @@ public class InspectionScreen {
                 }
             }
         }
-        int redstoneSignal = level.getSignal(pos, hitResult.getDirection().getOpposite());
-        if (redstoneSignal > 0) {
-            inline_data.add("");
-            inline_data.add("Redstone signal: " + redstoneSignal);
-            if (state.isRedstoneConductor(level, pos) && level.getDirectSignalTo(pos) == redstoneSignal) {
-                for(Direction direction : Direction.values()) {
-                    BlockPos blockPos = pos.relative(direction);
-                    if (level.getDirectSignal(blockPos, direction) == redstoneSignal) {
-                        inline_data.add("Powered by: " + level.getBlockState(blockPos).getBlock().getName().getString());
-                        break;
-                    }
-                }
-            } else if (state.isSignalSource()) {
-                inline_data.add("Power from source");
-            } else {
-                inline_data.add("Quazi powered");
-            }
-        }
     }
 
-    public static void inspect(Entity entity) {
+    public void inspect(Entity entity) {
         inline_data.add("Name: " + entity.getType().getDescription().getString());
         if (entity.getType() == EntityType.ENDER_DRAGON || entity.getType() == EntityType.WITHER) {
             inline_data.add("Type: boss");
