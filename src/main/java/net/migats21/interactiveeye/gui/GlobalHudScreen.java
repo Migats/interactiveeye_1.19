@@ -1,17 +1,21 @@
 package net.migats21.interactiveeye.gui;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.migats21.interactiveeye.InteractiveEye;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiComponent;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.damagesource.DamageSource;
 
 public abstract class GlobalHudScreen extends GuiComponent {
     private static GlobalHudScreen inspectionScreen;
     protected static Style font;
     protected static Minecraft minecraft;
     private static GlobalHudScreen dashboardScreen;
+    private static WarningScreen warningScreen;
     protected float ani_progress;
     protected float render_cooldown;
 
@@ -20,11 +24,15 @@ public abstract class GlobalHudScreen extends GuiComponent {
         font = Style.EMPTY.withFont(new ResourceLocation(InteractiveEye.MODID, "rounded"));
         inspectionScreen = new InspectionScreen();
         dashboardScreen = new DashboardScreen();
+        warningScreen = new WarningScreen();
     }
 
     public static void renderAll(PoseStack poseStack, float deltaFrameTime) {
-        inspectionScreen.render(poseStack, deltaFrameTime, minecraft.getWindow().getGuiScaledWidth(), minecraft.getWindow().getGuiScaledHeight());
-        dashboardScreen.render(poseStack, deltaFrameTime, minecraft.getWindow().getGuiScaledWidth(), minecraft.getWindow().getGuiScaledHeight());
+        int width = minecraft.getWindow().getGuiScaledWidth();
+        int height = minecraft.getWindow().getGuiScaledHeight();
+        inspectionScreen.render(poseStack, deltaFrameTime, width, height);
+        dashboardScreen.render(poseStack, deltaFrameTime, width, height);
+        warningScreen.render(poseStack, deltaFrameTime, width, height);
     }
 
     // Bezier curve formula provided by technobroken
@@ -38,6 +46,14 @@ public abstract class GlobalHudScreen extends GuiComponent {
 
     public static void showDashboard() {
         dashboardScreen.show();
+    }
+
+    public static void showWarning() {
+        warningScreen.setAlert(5.0f);
+    }
+
+    public static void hideWarning() {
+        warningScreen.setAlert(0.0f);
     }
 
     protected abstract void show();

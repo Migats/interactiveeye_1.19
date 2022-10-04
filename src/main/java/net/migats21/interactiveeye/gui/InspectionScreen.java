@@ -40,6 +40,7 @@ import org.apache.commons.compress.utils.Lists;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -98,7 +99,7 @@ public class InspectionScreen extends GlobalHudScreen {
                 int hour = ((int) Math.floor(currentTime * 0.001d) + 6) % 24;
                 int min = (int) Math.floor(currentTime * 0.06d % 60d);
                 inline_data.add("Dimension: " + Component.translatable(level.dimension().location().toLanguageKey()).getString());
-                inline_data.add("Time: " + hour + ":" + String.format("%02d", min));
+                inline_data.add(String.format(Locale.ROOT, "Time: %d:%02d", hour, min));//"Time: " + hour + ":" + String.format("%02d", min));
                 inline_data.add("Weather: " + (level.isThundering() ? "thunder" : level.isRaining() ? "raining" : "clear"));
             }
         }
@@ -295,6 +296,7 @@ public class InspectionScreen extends GlobalHudScreen {
                 } else {
                     inline_data.add("Type: hostile");
                 }
+                // Will have the deep learning applied to get its attacks
             } else if (entity instanceof Npc) {
                 inline_data.add("Type: human");
             } else if (entity instanceof Animal || entity instanceof AmbientCreature) {

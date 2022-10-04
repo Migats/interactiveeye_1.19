@@ -3,3 +3,7 @@ accessible method net/minecraft/client/gui/screens/inventory/AbstractContainerSc
 accessible class net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen$CustomCreativeSlot
 accessible method net/minecraft/world/item/BlockItem getPlacementState (Lnet/minecraft/world/item/context/BlockPlaceContext;)Lnet/minecraft/world/level/block/state/BlockState;
 accessible field net/minecraft/client/Minecraft fps I
+accessible field net/minecraft/client/renderer/LevelRenderer renderedEntities I
+accessible field net/minecraft/client/renderer/LevelRenderer viewArea Lnet/minecraft/client/renderer/ViewArea;
+accessible field net/minecraft/client/gui/screens/inventory/AnvilScreen name Lnet/minecraft/client/gui/components/EditBox;
+accessible method net/minecraft/world/entity/LivingEntity calculateFallDamage (FF)I
