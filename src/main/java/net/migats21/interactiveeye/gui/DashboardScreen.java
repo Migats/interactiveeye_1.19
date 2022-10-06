@@ -22,11 +22,11 @@ public class DashboardScreen extends GlobalHudScreen {
         if (refreshRate > Minecraft.fps || render_cooldown < 200.0f) {
             ani_progress += tickDelta;
             if (Minecraft.fps > refreshRate) render_cooldown += tickDelta; else render_cooldown = 0;
+            int hudWidth = 196;
             int hudHeight = 48;
             int animatedHudHeight = (int) (bezierCurveAnimation(Math.min(Math.min(ani_progress/8.0f, 10.0f - render_cooldown/20.0f), 1.0f), 0, 0.75f, 1.0f, 1.0f) * hudHeight);
             int x = width - 200;
             int y = 4;
-            int hudWidth = 196;
             renderBackground(poseStack, x, y, hudWidth, animatedHudHeight);
             if (ani_progress > 8.0f && render_cooldown < 180.0f) {
                 poseStack.translate(0.0, 0.0, 1000.0);

@@ -43,5 +43,11 @@
   "materials.water_plant": "Water plant",
   "materials.cobweb": "Cobweb",
   "materials.wood": "Wood",
-  "materials.wool": "Wool"
+  "materials.wool": "Wool",
+
+  "warning.attack.fall": "Deadly freefall velocity",
+  "warning.attack.outOfWorld": "Inside void territory",
+  "warning.attack.explosion": "Explosion can happen on any moment",
+  "warning.attack.explosion.player": "%s is about to explode",
+  "warning.attack.projectile": "%s is about to hit"
 }
