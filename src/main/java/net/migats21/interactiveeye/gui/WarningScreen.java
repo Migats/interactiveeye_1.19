@@ -93,6 +93,10 @@ public class WarningScreen extends GlobalHudScreen {
             }
         }
         if (minecraft.player.isOnFire() && !minecraft.player.hasEffect(MobEffects.FIRE_RESISTANCE)) {
+            if (minecraft.player.isInLava()) {
+                cause = DamageSource.LAVA;
+                return;
+            }
             cause = DamageSource.ON_FIRE;
             return;
         }
@@ -119,18 +123,18 @@ public class WarningScreen extends GlobalHudScreen {
                 } else {
                     double d = minecraft.player.getX() - entity.getX();
                     double e = minecraft.player.getZ() - entity.getZ();
-                    double f = Math.sqrt(d*d+e*e);
-                    Vec3 movement = entity.getDeltaMovement().multiply(64.0, 64.0, 64.0).add(0.0, f * -12.8 * entity.moveDist, 0.0);
-                    HitResult hitResult = level.clip(new ClipContext(entity.position(), entity.position().add(movement), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity));
+                    Vec3 deltaMovement = entity.getDeltaMovement();
+                    double f = Math.sqrt(d*d+e*e) / Math.sqrt(deltaMovement.x*deltaMovement.x+deltaMovement.z*deltaMovement.z); //* Math.sqrt(deltaMovement.x * deltaMovement.x + deltaMovement.z * deltaMovement.z);
+                    Vec3 checkingMovement = deltaMovement.multiply(64.0, 64.0, 64.0).add(0.0, f * -1.42, 0.0);
+                    HitResult hitResult = level.clip(new ClipContext(entity.position(), entity.position().add(checkingMovement), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity));
                     if (hitResult.getType() != HitResult.Type.MISS) {
                         Vec3 hitPos = hitResult.getLocation();
-                        hitResult = Objects.requireNonNullElse(ProjectileUtil.getEntityHitResult(level, entity, entity.position(), hitPos, entity.getBoundingBox().expandTowards(entity.getDeltaMovement()).inflate(64.0), projectile::canHitEntity), hitResult);
+                        hitResult = Objects.requireNonNullElse(ProjectileUtil.getEntityHitResult(level, entity, entity.position(), hitPos, entity.getBoundingBox().expandTowards(deltaMovement).inflate(64.0), projectile::canHitEntity), hitResult);
                         if (hitResult.getType() == HitResult.Type.ENTITY) {
                             if (projectile.getOwner() instanceof LivingEntity livingEntity) {
                                 cause = new IndirectEntityDamageSource("projectile", entity, livingEntity);
                             } else {
                                 cause = new IndirectEntityDamageSource("projectile", entity, null);
-                                return;
                             }
                             return;
                         }
