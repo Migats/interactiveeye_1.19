@@ -51,5 +51,6 @@
   "warning.attack.explosion.player": "%s is about to explode",
   "warning.attack.projectile": "%s is about to hit",
   "warning.attack.onFire": "Extreme hot, needs cooling",
-  "warning.attack.lava": "Deadly meltdown, needs cooling"
+  "warning.attack.lava": "Deadly meltdown, needs cooling",
+  "warning.attack.drown": "Out of oxygen"
 }

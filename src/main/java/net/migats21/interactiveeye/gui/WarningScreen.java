@@ -9,23 +9,27 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.damagesource.EntityDamageSource;
 import net.minecraft.world.damagesource.IndirectEntityDamageSource;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.PrimedTnt;
 import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.*;
 import net.minecraft.world.entity.vehicle.MinecartTNT;
 import net.minecraft.world.item.alchemy.PotionUtils;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Objects;
@@ -35,7 +39,7 @@ public class WarningScreen extends GlobalHudScreen {
     private static final ResourceLocation WARNING_TEXTURE = new ResourceLocation(InteractiveEye.MODID, "textures/gui/warning_sign.png");
     private float healthDanger;
 
-    private DamageSource cause;
+    private DamageSource warningDeathCause;
 
     public WarningScreen() {
         ClientTickEvents.START_WORLD_TICK.register(this::tick);
@@ -47,7 +51,7 @@ public class WarningScreen extends GlobalHudScreen {
     }
     @Override
     protected void render(PoseStack poseStack, float deltaFrameTime, int width, int height) {
-        if (cause != null) {
+        if (warningDeathCause != null) {
             int x = 4;
             int y = height/2 - 32;
             int hudWidth = 160;
@@ -56,18 +60,20 @@ public class WarningScreen extends GlobalHudScreen {
             RenderSystem.setShaderTexture(0, WARNING_TEXTURE);
             RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 0.75f);
             poseStack.translate(0.0, 0.0, 1000.0);
-            poseStack.pushPose();
-            poseStack.scale(0.25f, 0.25f, 1.0f);
-            blit(poseStack, x*4 + 4, y*4 + 4, 0, 0, 256, 256);
-            poseStack.popPose();
+            blit(poseStack, x + 1, y + 1, 0, 0, 0, 64, 64, 64, 64);
             poseStack.pushPose();
             poseStack.scale(2.0f, 2.0f, 1.0f);
             Component styledData = Component.literal("WARNING!").withStyle(font);
             minecraft.font.draw(poseStack, styledData, x/2.0f + 28, y/2.0f + 4, 0xc0ffcc00);
             poseStack.popPose();
-            styledData = (cause.getDirectEntity() == null ? Component.translatable("warning.attack." + cause.msgId) : Component.translatable("warning.attack." + cause.msgId, cause.getDirectEntity().getDisplayName())).withStyle(font.withColor(0xc0ffffff));
+            styledData = getLocalizedWarningMessage().withStyle(font.withColor(0xc0ffffff));
             minecraft.font.drawWordWrap(styledData, x + 64, y + 28, 92, 3);
         }
+    }
+
+    @NotNull
+    private MutableComponent getLocalizedWarningMessage() {
+        return warningDeathCause.getDirectEntity() == null ? Component.translatable("warning.attack." + warningDeathCause.msgId) : Component.translatable("warning.attack." + warningDeathCause.msgId, warningDeathCause.getDirectEntity().getDisplayName());
     }
 
     protected void setAlert(float f) {
@@ -75,50 +81,59 @@ public class WarningScreen extends GlobalHudScreen {
     }
 
     public void tick(ClientLevel level) {
-        cause = null;
-        if (minecraft.player == null || !minecraft.player.isAlive()) return;
-        if (healthDanger > 0.0f && minecraft.player.getHealth() < healthDanger) {
-            cause = minecraft.player.getLastDamageSource();
+        DamageSource cause = getWarningDeathCause(level, minecraft.player);
+        if (cause == null) {
+            warningDeathCause = null;
             return;
         }
-        if (minecraft.player.fallDistance > 0) {
+        if (warningDeathCause != null && Objects.equals(cause.msgId, warningDeathCause.msgId) && cause.getDirectEntity() == warningDeathCause.getDirectEntity() && cause.getEntity() == warningDeathCause.getEntity()) {
+            return;
+        }
+        warningDeathCause = cause;
+        minecraft.getNarrator().sayNow(Component.literal("Warning. ").append(getLocalizedWarningMessage()));
+    }
+
+    private DamageSource getWarningDeathCause(Level level, Player player) {
+        if (player == null || !player.isAlive()) return null;
+        if (healthDanger > 0.0f && minecraft.player.getHealth() < healthDanger) {
+            return player.getLastDamageSource();
+        }
+        if (player.fallDistance > 0) {
             if (minecraft.player.getY() < level.getMinBuildHeight()) {
-                cause = DamageSource.OUT_OF_WORLD;
-                return;
+                return DamageSource.OUT_OF_WORLD;
             }
             int i = minecraft.player.calculateFallDamage(minecraft.player.fallDistance, 1.0f);
             if (i > minecraft.player.getHealth() && i > 6.0f) {
-                cause = DamageSource.FALL;
-                return;
+                return DamageSource.FALL;
             }
         }
         if (minecraft.player.isOnFire() && !minecraft.player.hasEffect(MobEffects.FIRE_RESISTANCE)) {
             if (minecraft.player.isInLava()) {
-                cause = DamageSource.LAVA;
-                return;
+                return DamageSource.LAVA;
             }
-            cause = DamageSource.ON_FIRE;
-            return;
+            return DamageSource.ON_FIRE;
+        }
+        if (minecraft.player.getAirSupply() <= 0) {
+            if (minecraft.player.getMaxHealth() - minecraft.player.getHealth() > EnchantmentHelper.getRespiration(minecraft.player) * 2) {
+                return DamageSource.DROWN;
+            }
         }
         List<Entity> entities = level.getEntities(null, minecraft.player.getBoundingBox().inflate(64.0));
         for(Entity entity : entities) {
             if (entity instanceof Creeper creeper && (creeper.getSwellDir() > 0 || creeper.isIgnited()) && entity.distanceTo(minecraft.player) < 5.0f) {
-                cause = DamageSource.explosion(creeper);
-                return;
+                return DamageSource.explosion(creeper);
             }
             if (entity instanceof PrimedTnt || entity instanceof MinecartTNT && level.getBlockState(new BlockPos(Mth.floor(entity.getX()), (Mth.floor(entity.getY())) - 1, Mth.floor(entity.getZ()))).is(Blocks.POWERED_RAIL)) {
-                cause = DamageSource.explosion((LivingEntity) null);
-                return;
+                return DamageSource.explosion((LivingEntity) null);
             }
             if (entity instanceof Projectile projectile && isDamagableProjectile(projectile)) {
                 if (entity instanceof ShulkerBullet || entity instanceof ThrownPotion) {
                     if (entity.distanceTo(minecraft.player) < 5.0f) {
                         if (projectile.getOwner() instanceof LivingEntity livingEntity) {
-                            cause = new IndirectEntityDamageSource("projectile", entity, livingEntity);
+                            return new IndirectEntityDamageSource("projectile", entity, livingEntity);
                         } else {
-                            cause = new IndirectEntityDamageSource("projectile", entity, null);
+                            return new IndirectEntityDamageSource("projectile", entity, null);
                         }
-                        return;
                     }
                 } else {
                     double d = minecraft.player.getX() - entity.getX();
@@ -132,16 +147,16 @@ public class WarningScreen extends GlobalHudScreen {
                         hitResult = Objects.requireNonNullElse(ProjectileUtil.getEntityHitResult(level, entity, entity.position(), hitPos, entity.getBoundingBox().expandTowards(deltaMovement).inflate(64.0), projectile::canHitEntity), hitResult);
                         if (hitResult.getType() == HitResult.Type.ENTITY) {
                             if (projectile.getOwner() instanceof LivingEntity livingEntity) {
-                                cause = new IndirectEntityDamageSource("projectile", entity, livingEntity);
+                                return new IndirectEntityDamageSource("projectile", entity, livingEntity);
                             } else {
-                                cause = new IndirectEntityDamageSource("projectile", entity, null);
+                                return new IndirectEntityDamageSource("projectile", entity, null);
                             }
-                            return;
                         }
                     }
                 }
             }
         }
+        return null;
     }
 
     private static boolean isDamagableProjectile(Projectile entity) {
