@@ -50,7 +50,10 @@
   "warning.attack.explosion": "Explosion can happen on any moment",
   "warning.attack.explosion.player": "%s is about to explode",
   "warning.attack.projectile": "%s is about to hit",
-  "warning.attack.onFire": "Extreme hot, needs cooling",
-  "warning.attack.lava": "Deadly meltdown, needs cooling",
-  "warning.attack.drown": "Out of oxygen"
+  "warning.attack.onFire": "Extreme hot. Needs cooling",
+  "warning.attack.lava": "Deadly meltdown. Needs cooling",
+  "warning.attack.drown": "Out of oxygen",
+  "warning.attack.wither": "Infected with wither",
+  "warning.attack.magic.poison": "Infected with poison",
+  "warning.attack.starve": "Low sugar level. Needs food"
 }

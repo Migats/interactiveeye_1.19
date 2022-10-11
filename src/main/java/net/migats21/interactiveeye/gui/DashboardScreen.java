@@ -1,6 +1,5 @@
 package net.migats21.interactiveeye.gui;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.PlayerInfo;
@@ -8,12 +7,12 @@ import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.network.chat.Component;
 
 import java.util.Locale;
-import java.util.regex.Pattern;
 
 public class DashboardScreen extends GlobalHudScreen {
     @Override
     protected void show() {
         render_cooldown = 0.0f;
+        minecraft.getNarrator().sayNow(Component.literal("Game status: current framerate around " + Minecraft.fps + " frames per second"));
     }
 
     @Override
@@ -36,7 +35,7 @@ public class DashboardScreen extends GlobalHudScreen {
                 int j = minecraft.font.draw(poseStack, styledData, x/4f + 2, y/4f + 2.5f, 0xc0ffffff);
                 poseStack.scale(0.5f, 0.5f, 0.5f);
                 styledData = Component.literal("fps").withStyle(font);
-                minecraft.font.draw(poseStack, styledData, j*2, y/2f + 12, 0xc0ffffff);;
+                minecraft.font.draw(poseStack, styledData, j*2, y/2f + 12, 0xc0ffffff);
                 poseStack.popPose();
                 //float f = minecraft.player.connection.getConnection().getAverageSentPackets();
                 //float g = minecraft.player.connection.getConnection().getAverageReceivedPackets();

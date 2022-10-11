@@ -101,12 +101,14 @@ public class InspectionScreen extends GlobalHudScreen {
                 inline_data.add("Dimension: " + Component.translatable(level.dimension().location().toLanguageKey()).getString());
                 inline_data.add(String.format(Locale.ROOT, "Time: %d:%02d", hour, min));//"Time: " + hour + ":" + String.format("%02d", min));
                 inline_data.add("Weather: " + (level.isThundering() ? "thunder" : level.isRaining() ? "raining" : "clear"));
+                minecraft.getNarrator().sayNow(Component.literal("Inspecting world: ").append(Component.translatable(level.dimension().location().toLanguageKey())));
             }
         }
     }
 
     private void inspect(Screen screen) {
         if (screen instanceof AbstractContainerScreen<?> containerScreen) {
+            String screenName;
             if (screen instanceof EffectRenderingInventoryScreen<?>) {
                 if (screen instanceof CreativeModeInventoryScreen creativeScreen) {
                     int selectedTabId = creativeScreen.getSelectedTab();
@@ -124,11 +126,14 @@ public class InspectionScreen extends GlobalHudScreen {
                         }
                         inline_data.add("Current tab: " + selectedTab.getDisplayName().getString());
                     }
+                    screenName = "Creative";
                 } else {
                     inline_data.add("Current screen: Inventory");
+                    screenName = "Inventory";
                 }
             } else {
-                inline_data.add("Current screen: " + screen.getTitle().getString());
+                screenName = screen.getTitle().getString();
+                inline_data.add("Current screen: " + screenName);
             }
             double xpos = minecraft.mouseHandler.xpos() * (double)minecraft.getWindow().getGuiScaledWidth() / (double)minecraft.getWindow().getScreenWidth();
             double ypos = minecraft.mouseHandler.ypos() * (double)minecraft.getWindow().getGuiScaledHeight() / (double)minecraft.getWindow().getScreenHeight();
@@ -138,7 +143,9 @@ public class InspectionScreen extends GlobalHudScreen {
                 ItemStack hoveredStack = hoveredSlot.getItem();
                 if (!hoveredStack.isEmpty()) {
                     inline_data.add("Item: " + hoveredStack.getItem().getDescription().getString());
-                    inline_data.add("Type: " + hoveredStack.getItem().getItemCategory().getDisplayName().getString());
+                    CreativeModeTab category = hoveredStack.getItem().getItemCategory();
+                    inline_data.add("Type: " + (category == null ? "Unknown" : category.getDisplayName().getString()));
+                    minecraft.getNarrator().sayNow(Component.literal("Inspecting item: ").append(hoveredStack.getItem().getDescription()));
                     int maxStackSize = hoveredStack.getItem().getMaxStackSize();
                     if (maxStackSize > 1) {
                         inline_data.add(maxStackSize + " stackable");
@@ -173,11 +180,14 @@ public class InspectionScreen extends GlobalHudScreen {
                         }
                     }
                 } else {
+                    minecraft.getNarrator().sayNow(Component.literal("Inspecting menu: ").append(screenName));
                     inline_data.add("Slot: Empty");
                     if (!carrying.isEmpty()) {
                         inline_data.add(hoveredSlot instanceof CreativeModeInventoryScreen.CustomCreativeSlot ? "Destroys carried item" : hoveredSlot.mayPlace(carrying) ? "Can place inside" : "Cannot place inside");
                     }
                 }
+            } else {
+                minecraft.getNarrator().sayNow(Component.literal("Inspecting menu: ").append(screenName));
             }
         }
     }
@@ -187,6 +197,7 @@ public class InspectionScreen extends GlobalHudScreen {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
         inline_data.add("Block: " + block.getName().getString());
+        minecraft.getNarrator().sayNow(Component.literal("Inspecting block: ").append(block.getName()));
         inline_data.add("Type: " + Component.translatable("materials." +
                 Objects.requireNonNullElse(StringMappings.materials.get(state.getMaterial()), "unknown")
         ).getString());
@@ -226,7 +237,7 @@ public class InspectionScreen extends GlobalHudScreen {
             );
         } else if (block instanceof RespawnAnchorBlock) {
             inline_data.add(RespawnAnchorBlock.canSetSpawn(level) ? "Can set spawn" : "Explodes on charge");
-        } else if (block instanceof BeehiveBlock && level.getBlockEntity(pos) instanceof BeehiveBlockEntity entity) {
+        } else if (block instanceof BeehiveBlock) {
             inline_data.add(CampfireBlock.isSmokeyPos(level, pos) ? "Safe to harvest" : "Unsafe to harvest");
         }
         if (!state.getValues().isEmpty()) {
@@ -287,6 +298,7 @@ public class InspectionScreen extends GlobalHudScreen {
 
     public void inspect(Entity entity) {
         inline_data.add("Name: " + entity.getType().getDescription().getString());
+        minecraft.getNarrator().sayNow(Component.literal("Inspecting entity: ").append(entity.getType().getDescription()));
         if (entity.getType() == EntityType.ENDER_DRAGON || entity.getType() == EntityType.WITHER) {
             inline_data.add("Type: boss");
         } else if (entity instanceof LivingEntity livingEntity) {

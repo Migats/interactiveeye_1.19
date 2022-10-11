@@ -27,6 +27,7 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
@@ -37,6 +38,7 @@ import java.util.Objects;
 public class WarningScreen extends GlobalHudScreen {
 
     private static final ResourceLocation WARNING_TEXTURE = new ResourceLocation(InteractiveEye.MODID, "textures/gui/warning_sign.png");
+    private static final DamageSource POISON_DAMAGE_SOURCE = new DamageSource("magic.poison").bypassArmor().setMagic();
     private float healthDanger;
 
     private DamageSource warningDeathCause;
@@ -47,7 +49,7 @@ public class WarningScreen extends GlobalHudScreen {
     @Override
     @Deprecated
     protected void show() {
-        throw new IllegalCallerException("Medhod show cannot be called on WarningScreen");
+        throw new IllegalCallerException("Method show cannot be called on WarningScreen");
     }
     @Override
     protected void render(PoseStack poseStack, float deltaFrameTime, int width, int height) {
@@ -95,40 +97,41 @@ public class WarningScreen extends GlobalHudScreen {
 
     private DamageSource getWarningDeathCause(Level level, Player player) {
         if (player == null || !player.isAlive()) return null;
-        if (healthDanger > 0.0f && minecraft.player.getHealth() < healthDanger) {
+        if (healthDanger > 0.0f && player.getHealth() < healthDanger) {
             return player.getLastDamageSource();
         }
         if (player.fallDistance > 0) {
-            if (minecraft.player.getY() < level.getMinBuildHeight()) {
+            if (player.getY() < level.getMinBuildHeight()) {
                 return DamageSource.OUT_OF_WORLD;
             }
-            int i = minecraft.player.calculateFallDamage(minecraft.player.fallDistance, 1.0f);
-            if (i > minecraft.player.getHealth() && i > 6.0f) {
+            int i = player.calculateFallDamage(player.fallDistance, 1.0f);
+            if (i > player.getHealth() && i > 6.0f) {
                 return DamageSource.FALL;
             }
         }
-        if (minecraft.player.isOnFire() && !minecraft.player.hasEffect(MobEffects.FIRE_RESISTANCE)) {
-            if (minecraft.player.isInLava()) {
+        if (player.isOnFire() && !player.hasEffect(MobEffects.FIRE_RESISTANCE)) {
+            if (player.isInLava()) {
                 return DamageSource.LAVA;
             }
             return DamageSource.ON_FIRE;
         }
-        if (minecraft.player.getAirSupply() <= 0) {
-            if (minecraft.player.getMaxHealth() - minecraft.player.getHealth() > EnchantmentHelper.getRespiration(minecraft.player) * 2) {
-                return DamageSource.DROWN;
-            }
+        if (player.hasEffect(MobEffects.WITHER)) {
+            return DamageSource.WITHER;
         }
-        List<Entity> entities = level.getEntities(null, minecraft.player.getBoundingBox().inflate(64.0));
+        if (player.hasEffect(MobEffects.POISON)) {
+            return POISON_DAMAGE_SOURCE;
+        }
+        List<Entity> entities = level.getEntities(null, player.getBoundingBox().inflate(64.0));
         for(Entity entity : entities) {
-            if (entity instanceof Creeper creeper && (creeper.getSwellDir() > 0 || creeper.isIgnited()) && entity.distanceTo(minecraft.player) < 5.0f) {
+            if (entity instanceof Creeper creeper && (creeper.getSwellDir() > 0 || creeper.isIgnited()) && entity.distanceTo(player) < 5.0f) {
                 return DamageSource.explosion(creeper);
             }
             if (entity instanceof PrimedTnt || entity instanceof MinecartTNT && level.getBlockState(new BlockPos(Mth.floor(entity.getX()), (Mth.floor(entity.getY())) - 1, Mth.floor(entity.getZ()))).is(Blocks.POWERED_RAIL)) {
                 return DamageSource.explosion((LivingEntity) null);
             }
-            if (entity instanceof Projectile projectile && isDamagableProjectile(projectile)) {
+            if (entity instanceof Projectile projectile && isDamageableProjectile(projectile, player)) {
                 if (entity instanceof ShulkerBullet || entity instanceof ThrownPotion) {
-                    if (entity.distanceTo(minecraft.player) < 5.0f) {
+                    if (entity.distanceTo(player) < 5.0f) {
                         if (projectile.getOwner() instanceof LivingEntity livingEntity) {
                             return new IndirectEntityDamageSource("projectile", entity, livingEntity);
                         } else {
@@ -136,16 +139,18 @@ public class WarningScreen extends GlobalHudScreen {
                         }
                     }
                 } else {
-                    double d = minecraft.player.getX() - entity.getX();
-                    double e = minecraft.player.getZ() - entity.getZ();
+                    double d = player.getX() - entity.getX();
+                    double e = player.getZ() - entity.getZ();
+                    // Delta movement is serverside handled. Must figure out how to get the movement another way.
                     Vec3 deltaMovement = entity.getDeltaMovement();
-                    double f = Math.sqrt(d*d+e*e) / Math.sqrt(deltaMovement.x*deltaMovement.x+deltaMovement.z*deltaMovement.z); //* Math.sqrt(deltaMovement.x * deltaMovement.x + deltaMovement.z * deltaMovement.z);
+                    double f = 0;
+                    if (!(entity instanceof AbstractHurtingProjectile)) f = Math.sqrt(d*d+e*e) / Math.sqrt(deltaMovement.x*deltaMovement.x+deltaMovement.z*deltaMovement.z); //* Math.sqrt(deltaMovement.x * deltaMovement.x + deltaMovement.z * deltaMovement.z);
                     Vec3 checkingMovement = deltaMovement.multiply(64.0, 64.0, 64.0).add(0.0, f * -1.42, 0.0);
                     HitResult hitResult = level.clip(new ClipContext(entity.position(), entity.position().add(checkingMovement), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity));
                     if (hitResult.getType() != HitResult.Type.MISS) {
                         Vec3 hitPos = hitResult.getLocation();
                         hitResult = Objects.requireNonNullElse(ProjectileUtil.getEntityHitResult(level, entity, entity.position(), hitPos, entity.getBoundingBox().expandTowards(deltaMovement).inflate(64.0), projectile::canHitEntity), hitResult);
-                        if (hitResult.getType() == HitResult.Type.ENTITY) {
+                        if (hitResult.getType() == HitResult.Type.ENTITY && ((EntityHitResult) hitResult).getEntity() == player) {
                             if (projectile.getOwner() instanceof LivingEntity livingEntity) {
                                 return new IndirectEntityDamageSource("projectile", entity, livingEntity);
                             } else {
@@ -156,15 +161,23 @@ public class WarningScreen extends GlobalHudScreen {
                 }
             }
         }
+        if (player.getAirSupply() <= 0) {
+            if (player.getMaxHealth() - player.getHealth() > EnchantmentHelper.getRespiration(player) * 2) {
+                return DamageSource.DROWN;
+            }
+        }
+        if (player.getFoodData().getFoodLevel() <= 6.0f) {
+            return DamageSource.STARVE;
+        }
         return null;
     }
 
-    private static boolean isDamagableProjectile(Projectile entity) {
+    private static boolean isDamageableProjectile(Projectile entity, Player player) {
         if (entity instanceof ThrownPotion potion) {
             return PotionUtils.getMobEffects(potion.getItem()).stream().anyMatch((effect) -> effect.getEffect() == MobEffects.HARM);
         }
         if (entity instanceof LlamaSpit) {
-            return minecraft.player.getHealth() < 4.0f;
+            return player.getHealth() < 4.0f;
         }
         if (entity instanceof ThrowableProjectile || entity instanceof FishingHook) {
             return false;

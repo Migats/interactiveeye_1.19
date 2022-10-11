@@ -8,3 +8,5 @@ accessible field net/minecraft/client/renderer/LevelRenderer viewArea Lnet/minec
 accessible field net/minecraft/client/gui/screens/inventory/AnvilScreen name Lnet/minecraft/client/gui/components/EditBox;
 accessible method net/minecraft/world/entity/LivingEntity calculateFallDamage (FF)I
 accessible method net/minecraft/world/entity/projectile/Projectile canHitEntity (Lnet/minecraft/world/entity/Entity;)Z
+accessible method net/minecraft/world/damagesource/DamageSource <init> (Ljava/lang/String;)V
+accessible method net/minecraft/world/damagesource/DamageSource bypassArmor ()Lnet/minecraft/world/damagesource/DamageSource;
