@@ -17,8 +17,11 @@ import net.minecraft.world.damagesource.IndirectEntityDamageSource;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.NeutralMob;
+import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.item.PrimedTnt;
 import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.*;
 import net.minecraft.world.entity.vehicle.MinecartTNT;
@@ -27,11 +30,16 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.CactusBlock;
+import net.minecraft.world.level.block.CampfireBlock;
+import net.minecraft.world.level.block.SweetBerryBushBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -83,6 +91,7 @@ public class WarningScreen extends GlobalHudScreen {
     }
 
     public void tick(ClientLevel level) {
+        if (minecraft.player == null) return;
         DamageSource cause = getWarningDeathCause(level, minecraft.player);
         if (cause == null) {
             warningDeathCause = null;
@@ -95,17 +104,24 @@ public class WarningScreen extends GlobalHudScreen {
         minecraft.getNarrator().sayNow(Component.literal("Warning. ").append(getLocalizedWarningMessage()));
     }
 
+    @SuppressWarnings("Deprication")
     private DamageSource getWarningDeathCause(Level level, Player player) {
-        if (player == null || !player.isAlive()) return null;
-        if (healthDanger > 0.0f && player.getHealth() < healthDanger) {
-            return player.getLastDamageSource();
+        if (!player.isAlive()) {
+            healthDanger = 0.0f;
+            return null;
+        }
+        if (healthDanger > 0.0f && healthDanger >= player.getHealth()) {
+            return DamageSource.GENERIC;
+        }
+        if (player.isInWall()) {
+            return DamageSource.IN_WALL;
         }
         if (player.fallDistance > 0) {
             if (player.getY() < level.getMinBuildHeight()) {
                 return DamageSource.OUT_OF_WORLD;
             }
             int i = player.calculateFallDamage(player.fallDistance, 1.0f);
-            if (i > player.getHealth() && i > 6.0f) {
+            if (i > player.getHealth() && i > 12.0f) {
                 return DamageSource.FALL;
             }
         }
@@ -121,12 +137,44 @@ public class WarningScreen extends GlobalHudScreen {
         if (player.hasEffect(MobEffects.POISON)) {
             return POISON_DAMAGE_SOURCE;
         }
-        List<Entity> entities = level.getEntities(null, player.getBoundingBox().inflate(64.0));
-        for(Entity entity : entities) {
-            if (entity instanceof Creeper creeper && (creeper.getSwellDir() > 0 || creeper.isIgnited()) && entity.distanceTo(player) < 5.0f) {
-                return DamageSource.explosion(creeper);
+        if (level.getBlockState(player.getOnPosLegacy()).is(Blocks.MAGMA_BLOCK) && !player.isSteppingCarefully() && !EnchantmentHelper.hasFrostWalker(player)) {
+            return DamageSource.HOT_FLOOR;
+        }
+        List<BlockState> states = level.getBlockStates(player.getBoundingBox()).toList();
+        for (BlockState state : states) {
+            if (state.getBlock() instanceof CactusBlock) { // Should also work on modded cacti
+                return DamageSource.CACTUS;
             }
-            if (entity instanceof PrimedTnt || entity instanceof MinecartTNT && level.getBlockState(new BlockPos(Mth.floor(entity.getX()), (Mth.floor(entity.getY())) - 1, Mth.floor(entity.getZ()))).is(Blocks.POWERED_RAIL)) {
+            if (state.getBlock() instanceof SweetBerryBushBlock) {
+                return DamageSource.SWEET_BERRY_BUSH;
+            }
+            if (state.getBlock() instanceof CampfireBlock) {
+                return DamageSource.HOT_FLOOR;
+            }
+        }
+        if (player.isFullyFrozen() && player.canFreeze()) {
+            return DamageSource.FREEZE;
+        }
+        List<Entity> entities = level.getEntities(null, player.getBoundingBox().inflate(64.0));
+        List<LivingEntity> enemies = new ArrayList<>();
+        for(Entity entity : entities) {
+            if (entity instanceof LivingEntity livingEntity) {
+                if (livingEntity instanceof NeutralMob neutralMob) {
+                    if (neutralMob.isAngry()) {
+                        // TODO: Make neutral mobs anger system use the represented attributes
+                        return DamageSource.mobAttack(livingEntity);
+                    }
+                    continue;
+                }
+                if (livingEntity instanceof Enemy && entity.distanceTo(player) < 5.0f) {
+                    if (livingEntity instanceof Creeper creeper && (creeper.getSwellDir() > 0 || creeper.isIgnited()) || livingEntity instanceof WitherBoss witherBoss && witherBoss.getInvulnerableTicks() > 100) {
+                        return DamageSource.explosion(livingEntity);
+                    }
+                    enemies.add(livingEntity);
+                    continue;
+                }
+            }
+            if (entity instanceof PrimedTnt || entity instanceof MinecartTNT && level.getBlockState(new BlockPos(Mth.floor(entity.getX()), (Mth.floor(entity.getY())), Mth.floor(entity.getZ()))).is(Blocks.POWERED_RAIL) && entity.distanceTo(player) < 8) {
                 return DamageSource.explosion((LivingEntity) null);
             }
             if (entity instanceof Projectile projectile && isDamageableProjectile(projectile, player)) {
@@ -141,7 +189,7 @@ public class WarningScreen extends GlobalHudScreen {
                 } else {
                     double d = player.getX() - entity.getX();
                     double e = player.getZ() - entity.getZ();
-                    // Delta movement is serverside handled. Must figure out how to get the movement another way.
+                    // TODO: Use a mixin on the arrow movement instead of using DeltaMovement
                     Vec3 deltaMovement = entity.getDeltaMovement();
                     double f = 0;
                     if (!(entity instanceof AbstractHurtingProjectile)) f = Math.sqrt(d*d+e*e) / Math.sqrt(deltaMovement.x*deltaMovement.x+deltaMovement.z*deltaMovement.z); //* Math.sqrt(deltaMovement.x * deltaMovement.x + deltaMovement.z * deltaMovement.z);
@@ -169,6 +217,9 @@ public class WarningScreen extends GlobalHudScreen {
         if (player.getFoodData().getFoodLevel() <= 6.0f) {
             return DamageSource.STARVE;
         }
+        if (!enemies.isEmpty()) {
+            return DamageSource.mobAttack(enemies.get(0));
+        }
         return null;
     }
 
@@ -186,6 +237,9 @@ public class WarningScreen extends GlobalHudScreen {
             CompoundTag compoundTag = rocket.getItem().getTagElement("Fireworks");
             ListTag listTag = compoundTag == null ? null : compoundTag.getList("Explosions", 10);
             return listTag != null && !listTag.isEmpty();
+        }
+        if (entity instanceof AbstractArrow arrow && arrow.getPierceLevel() <= 0) {
+            return !player.isBlocking();
         }
         return true;
     }

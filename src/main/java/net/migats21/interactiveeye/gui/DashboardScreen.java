@@ -28,6 +28,7 @@ public class DashboardScreen extends GlobalHudScreen {
             int y = 4;
             renderBackground(poseStack, x, y, hudWidth, animatedHudHeight);
             if (ani_progress > 8.0f && render_cooldown < 180.0f) {
+                poseStack.pushPose();
                 poseStack.translate(0.0, 0.0, 1000.0);
                 poseStack.pushPose();
                 poseStack.scale(4, 4, 4);
@@ -61,6 +62,7 @@ public class DashboardScreen extends GlobalHudScreen {
                         minecraft.font.draw(poseStack, styledData, j, y + 7 + minecraft.font.lineHeight*3, 0xc0ffffff);
                     }
                 }
+                poseStack.popPose();
             }
         } else {
             ani_progress = 0.0f;

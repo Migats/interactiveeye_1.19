@@ -55,5 +55,11 @@
   "warning.attack.drown": "Out of oxygen",
   "warning.attack.wither": "Infected with wither",
   "warning.attack.magic.poison": "Infected with poison",
-  "warning.attack.starve": "Low sugar level. Needs food"
+  "warning.attack.starve": "Low sugar level. Needs food",
+  "warning.attack.mob": "%s is nearby and can hit",
+  "warning.attack.freeze": "Extreme cold, needs heating",
+  "warning.attack.cactus": "Pricking plant surface",
+  "warning.attack.sweetBerryBush": "Pricking bush thorns",
+  "warning.attack.hotFloor": "Hot floor surface",
+  "warning.attack.inWall": "Suffocating. Needs to mine out."
 }
