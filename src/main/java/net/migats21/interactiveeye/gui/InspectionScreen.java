@@ -29,7 +29,6 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.*;
-import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.phys.AABB;
@@ -63,7 +62,7 @@ public class InspectionScreen extends GlobalHudScreen {
         }
         ani_progress += tickDelta;
         int hudHeight = (minecraft.font.lineHeight + 2) * inline_data.size();
-        int animatedHudHeight = (int) (bezierCurveAnimation(Math.min(ani_progress/8.0f, 1.0f), 0, 0.75f, 1.0f, 1.0f) * hudHeight);
+        int animatedHudHeight = (int) (bezierCurve(Math.min(ani_progress/8.0f, 1.0f), 0, 0.75f, 1.0f, 1.0f) * hudHeight);
         int x = width / 2 + 98;
         int y = height - animatedHudHeight - 4;
         int hudWidth = width - 2 - x;
@@ -72,7 +71,7 @@ public class InspectionScreen extends GlobalHudScreen {
             poseStack.pushPose();
             poseStack.translate(0.0, 0.0, 1000.0);
             for (int i = 0; i < inline_data.size(); i++) {
-                Component styledDataLine = Component.literal(inline_data.get(i)).setStyle(font);
+                Component styledDataLine = Component.literal(inline_data.get(i)).setStyle(font.withObfuscated(ani_progress < 10.0f).withItalic(ani_progress < 10.0f && ani_progress % 1.0f < 0.5f));
                 minecraft.font.draw(poseStack, styledDataLine, x + 2, height - (minecraft.font.lineHeight + 2) * (inline_data.size() - i) - 2, 0xc0ffffff);
             }
             poseStack.popPose();
@@ -214,10 +213,20 @@ public class InspectionScreen extends GlobalHudScreen {
         } else if (breakspeed == 0.0f) {
             inline_data.add("Instabreakable");
         } else {
-            inline_data.add("Break in: " + String.format("%.02f", breakspeed) + "sec");
+            inline_data.add(String.format("Breaks in: %.02fsec", breakspeed));
         }
         if (!state.canSurvive(level, pos)) {
             inline_data.add("Illegal state");
+        }
+        if (state.isSuffocating(level, pos)) {
+            for(int i = 1; i < 256; i++) {
+                BlockPos blockPos = pos.relative(hitResult.getDirection().getOpposite(), i);
+                if (level.isOutsideBuildHeight(blockPos)) break;
+                if (!level.getBlockState(blockPos).isSuffocating(level, blockPos)) {
+                    inline_data.add(String.format("%d layers of blocks",i));
+                    break;
+                }
+            }
         }
         if (block instanceof BedBlock) {
             BlockPos blockPos = pos.relative(BedBlock.getConnectedDirection(state));
@@ -243,8 +252,8 @@ public class InspectionScreen extends GlobalHudScreen {
         if (!state.getValues().isEmpty()) {
             inline_data.add("");
             inline_data.add("Blockstate properties:");
-            ImmutableSet<Map.Entry<Property<?>, Comparable<?>>> stateentries = state.getValues().entrySet();
-            for (Map.Entry<Property<?>, Comparable<?>> entry : stateentries) {
+            ImmutableSet<Map.Entry<Property<?>, Comparable<?>>> stateEntries = state.getValues().entrySet();
+            for (Map.Entry<Property<?>, Comparable<?>> entry : stateEntries) {
                 Property<?> property = entry.getKey();
                 inline_data.add("  " + property.getName() + ": " + Objects.requireNonNullElse(StringMappings.propertyValues.get(property), String::valueOf).apply(Util.getPropertyName(property, entry.getValue())));
             }
@@ -290,10 +299,11 @@ public class InspectionScreen extends GlobalHudScreen {
                         }
                     }
                 } else {
-                    inline_data.add("Cannot be placed");
+                    inline_data.add((hitResult.isInside()) ? "Too close to place" : "Cannot be placed");
                 }
             }
         }
+
     }
 
     public void inspect(Entity entity) {

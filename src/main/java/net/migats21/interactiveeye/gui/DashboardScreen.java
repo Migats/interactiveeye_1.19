@@ -17,13 +17,12 @@ public class DashboardScreen extends GlobalHudScreen {
 
     @Override
     protected void render(PoseStack poseStack, float tickDelta, int width, int height) {
-        int refreshRate = minecraft.getWindow().getRefreshRate();
-        if (refreshRate > Minecraft.fps || render_cooldown < 200.0f) {
+        if (Minecraft.fps < 58 || render_cooldown < 200.0f) {
             ani_progress += tickDelta;
-            if (Minecraft.fps > refreshRate) render_cooldown += tickDelta; else render_cooldown = 0;
+            if (Minecraft.fps > 58) render_cooldown += tickDelta; else render_cooldown = 0;
             int hudWidth = 196;
             int hudHeight = 48;
-            int animatedHudHeight = (int) (bezierCurveAnimation(Math.min(Math.min(ani_progress/8.0f, 10.0f - render_cooldown/20.0f), 1.0f), 0, 0.75f, 1.0f, 1.0f) * hudHeight);
+            int animatedHudHeight = (int) (bezierCurve(Math.min(Math.min(ani_progress/8.0f, 10.0f - render_cooldown/20.0f), 1.0f), 0, 0.75f, 1.0f, 1.0f) * hudHeight);
             int x = width - 200;
             int y = 4;
             renderBackground(poseStack, x, y, hudWidth, animatedHudHeight);

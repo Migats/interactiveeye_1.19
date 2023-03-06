@@ -17,6 +17,7 @@ import net.minecraft.world.damagesource.IndirectEntityDamageSource;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.NeutralMob;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.item.PrimedTnt;
@@ -69,6 +70,7 @@ public class WarningScreen extends GlobalHudScreen {
             renderBackground(poseStack, x, y, hudWidth, hudHeight);
             RenderSystem.setShaderTexture(0, WARNING_TEXTURE);
             RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 0.75f);
+            poseStack.pushPose();
             poseStack.translate(0.0, 0.0, 1000.0);
             blit(poseStack, x + 1, y + 1, 0, 0, 0, 64, 64, 64, 64);
             poseStack.pushPose();
@@ -78,6 +80,7 @@ public class WarningScreen extends GlobalHudScreen {
             poseStack.popPose();
             styledData = getLocalizedWarningMessage().withStyle(font.withColor(0xc0ffffff));
             minecraft.font.drawWordWrap(styledData, x + 64, y + 28, 92, 3);
+            poseStack.popPose();
         }
     }
 
@@ -156,21 +159,15 @@ public class WarningScreen extends GlobalHudScreen {
             return DamageSource.FREEZE;
         }
         List<Entity> entities = level.getEntities(null, player.getBoundingBox().inflate(64.0));
-        List<LivingEntity> enemies = new ArrayList<>();
         for(Entity entity : entities) {
             if (entity instanceof LivingEntity livingEntity) {
-                if (livingEntity instanceof NeutralMob neutralMob) {
-                    if (neutralMob.isAngry()) {
-                        // TODO: Make neutral mobs anger system use the represented attributes
+                if (livingEntity instanceof Mob mob && entity.distanceTo(player) < 5.0f) {
+                    if (mob.isAggressive()) {
                         return DamageSource.mobAttack(livingEntity);
                     }
-                    continue;
-                }
-                if (livingEntity instanceof Enemy && entity.distanceTo(player) < 5.0f) {
                     if (livingEntity instanceof Creeper creeper && (creeper.getSwellDir() > 0 || creeper.isIgnited()) || livingEntity instanceof WitherBoss witherBoss && witherBoss.getInvulnerableTicks() > 100) {
                         return DamageSource.explosion(livingEntity);
                     }
-                    enemies.add(livingEntity);
                     continue;
                 }
             }
@@ -216,9 +213,6 @@ public class WarningScreen extends GlobalHudScreen {
         }
         if (player.getFoodData().getFoodLevel() <= 6.0f) {
             return DamageSource.STARVE;
-        }
-        if (!enemies.isEmpty()) {
-            return DamageSource.mobAttack(enemies.get(0));
         }
         return null;
     }

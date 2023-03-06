@@ -6,6 +6,10 @@
   "mixins": [
   ],
   "client": [
+    "MixinChatComponent",
+    "MixinChatScreen",
+    "MixinCommandSuggestionList",
+    "MixinCommandSuggestions",
     "MixinGameGlobalHud"
   ],
   "injectors": {
