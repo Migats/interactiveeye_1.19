@@ -18,11 +18,9 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.NeutralMob;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.item.PrimedTnt;
 import net.minecraft.world.entity.monster.Creeper;
-import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.*;
 import net.minecraft.world.entity.vehicle.MinecartTNT;
@@ -107,7 +105,7 @@ public class WarningScreen extends GlobalHudScreen {
         minecraft.getNarrator().sayNow(Component.literal("Warning. ").append(getLocalizedWarningMessage()));
     }
 
-    @SuppressWarnings("Deprication")
+    @SuppressWarnings("deprecation")
     private DamageSource getWarningDeathCause(Level level, Player player) {
         if (!player.isAlive()) {
             healthDanger = 0.0f;
@@ -159,11 +157,13 @@ public class WarningScreen extends GlobalHudScreen {
             return DamageSource.FREEZE;
         }
         List<Entity> entities = level.getEntities(null, player.getBoundingBox().inflate(64.0));
+        List<Mob> enemies = new ArrayList<>();
         for(Entity entity : entities) {
             if (entity instanceof LivingEntity livingEntity) {
                 if (livingEntity instanceof Mob mob && entity.distanceTo(player) < 5.0f) {
                     if (mob.isAggressive()) {
-                        return DamageSource.mobAttack(livingEntity);
+                        enemies.add(mob);
+                        continue;
                     }
                     if (livingEntity instanceof Creeper creeper && (creeper.getSwellDir() > 0 || creeper.isIgnited()) || livingEntity instanceof WitherBoss witherBoss && witherBoss.getInvulnerableTicks() > 100) {
                         return DamageSource.explosion(livingEntity);
@@ -187,10 +187,10 @@ public class WarningScreen extends GlobalHudScreen {
                     double d = player.getX() - entity.getX();
                     double e = player.getZ() - entity.getZ();
                     // TODO: Use a mixin on the arrow movement instead of using DeltaMovement
-                    Vec3 deltaMovement = entity.getDeltaMovement();
+                    Vec3 deltaMovement = new Vec3(entity.getX() - entity.xo, entity.getY() - entity.yo, entity.getZ() - entity.zo);
                     double f = 0;
                     if (!(entity instanceof AbstractHurtingProjectile)) f = Math.sqrt(d*d+e*e) / Math.sqrt(deltaMovement.x*deltaMovement.x+deltaMovement.z*deltaMovement.z); //* Math.sqrt(deltaMovement.x * deltaMovement.x + deltaMovement.z * deltaMovement.z);
-                    Vec3 checkingMovement = deltaMovement.multiply(64.0, 64.0, 64.0).add(0.0, f * -1.42, 0.0);
+                    Vec3 checkingMovement = deltaMovement.add(0.0, f * -0.3200000047683716, 0.0).multiply(64.0, 64.0, 64.0);
                     HitResult hitResult = level.clip(new ClipContext(entity.position(), entity.position().add(checkingMovement), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity));
                     if (hitResult.getType() != HitResult.Type.MISS) {
                         Vec3 hitPos = hitResult.getLocation();
@@ -206,6 +206,7 @@ public class WarningScreen extends GlobalHudScreen {
                 }
             }
         }
+        if (enemies.size() != 0) return DamageSource.mobAttack(enemies.get(0));
         if (player.getAirSupply() <= 0) {
             if (player.getMaxHealth() - player.getHealth() > EnchantmentHelper.getRespiration(player) * 2) {
                 return DamageSource.DROWN;

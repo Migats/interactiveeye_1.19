@@ -28,3 +28,4 @@ accessible method net/minecraft/client/gui/screens/ChatScreen chatPreviewTop (I)
 accessible method net/minecraft/client/gui/screens/ChatScreen chatPreviewLeft ()I
 accessible method net/minecraft/client/gui/screens/ChatScreen chatPreviewBottom ()I
 accessible method net/minecraft/client/gui/screens/ChatScreen renderChatPreviewHighlights (Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/util/FormattedCharSequence;II)V
+accessible method net/minecraft/client/gui/components/CommandSuggestions formatText (Lcom/mojang/brigadier/ParseResults;Ljava/lang/String;I)Lnet/minecraft/util/FormattedCharSequence;
